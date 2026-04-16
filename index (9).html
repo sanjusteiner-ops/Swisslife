@@ -1,0 +1,2161 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CRM Réseau — Swiss Life Select</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+// Auth functions defined early so onclick handlers in HTML can find them
+function showLogin(){document.getElementById('auth-login').style.display='block';document.getElementById('auth-register').style.display='none';document.getElementById('auth-otp').style.display='none';}
+function showRegister(){document.getElementById('auth-login').style.display='none';document.getElementById('auth-register').style.display='block';document.getElementById('auth-otp').style.display='none';}
+function showOTP(){document.getElementById('auth-login').style.display='none';document.getElementById('auth-register').style.display='none';document.getElementById('auth-otp').style.display='block';}
+</script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'DM Sans',sans-serif;background:#06101a;color:#e8f0ff;overflow:hidden;width:100vw;height:100vh;user-select:none;display:flex}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:rgba(74,158,255,0.18);border-radius:4px}
+input,textarea,select{font-family:'DM Sans',sans-serif}
+input[type=date]::-webkit-calendar-picker-indicator{filter:invert(0.5)}
+
+/* ── SIDEBAR ── */
+#sidebar{width:260px;min-width:260px;height:100vh;background:linear-gradient(180deg,#080f1a,#06101a);border-right:1px solid rgba(255,255,255,0.06);display:flex;flex-direction:column;z-index:30;transition:width 0.25s,min-width 0.25s;overflow:hidden}
+#sidebar.collapsed{width:54px;min-width:54px}
+#sb-header{padding:14px 12px;display:flex;align-items:center;gap:10px;border-bottom:1px solid rgba(255,255,255,0.05)}
+#sb-logo{width:30px;height:30px;min-width:30px;border-radius:8px;background:linear-gradient(135deg,#1e6fcf,#0e4fa0);display:flex;align-items:center;justify-content:center;font-size:15px;cursor:pointer}
+#sb-title{color:#e8f0ff;font-weight:800;font-size:13px;white-space:nowrap;overflow:hidden}
+#sb-sub{color:#2a4060;font-size:10px;white-space:nowrap}
+#sb-collapse{margin-left:auto;background:none;border:none;color:#2a4060;cursor:pointer;font-size:14px;padding:2px 4px;flex-shrink:0}
+#sb-body{flex:1;overflow-y:auto;overflow-x:hidden;padding:10px 8px}
+#sidebar.collapsed #sb-title,#sidebar.collapsed #sb-sub,#sidebar.collapsed #sb-collapse-label{display:none}
+
+.sb-section{margin-bottom:4px}
+.sb-section-title{color:#1e3050;font-size:9px;text-transform:uppercase;letter-spacing:.12em;font-weight:700;padding:6px 6px 4px;white-space:nowrap;overflow:hidden}
+.sb-item{display:flex;align-items:center;gap:9px;padding:8px 8px;border-radius:9px;cursor:pointer;transition:background 0.15s;white-space:nowrap;overflow:hidden}
+.sb-item:hover{background:rgba(74,158,255,0.08)}
+.sb-item.active{background:rgba(74,158,255,0.15);border:1px solid rgba(74,158,255,0.2)}
+.sb-item .sb-icon{font-size:15px;flex-shrink:0;width:20px;text-align:center}
+.sb-item .sb-label{color:#6b8099;font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis}
+.sb-item.active .sb-label{color:#4a9eff}
+.sb-item .sb-badge{margin-left:auto;background:rgba(74,158,255,0.15);color:#4a9eff;font-size:10px;font-weight:700;padding:2px 6px;border-radius:8px;flex-shrink:0}
+#sidebar.collapsed .sb-label,.sb-section-title-text{overflow:hidden}
+#sidebar.collapsed .sb-section-title{opacity:0}
+
+/* Search in sidebar */
+#sb-search-wrap{padding:6px 0 10px}
+#sb-search-box{position:relative}
+#sb-search-input{width:100%;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:9px;padding:8px 10px 8px 32px;color:#e8f0ff;font-size:12px;outline:none;font-family:'DM Sans',sans-serif;transition:border-color 0.2s}
+#sb-search-input:focus{border-color:rgba(74,158,255,0.35);background:rgba(74,158,255,0.05)}
+#sb-search-icon{position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:13px;pointer-events:none}
+#sb-search-results{margin-top:4px;max-height:220px;overflow-y:auto}
+.sb-sr-item{padding:8px 10px;border-radius:8px;cursor:pointer;transition:background 0.12s;border-bottom:1px solid rgba(255,255,255,0.03)}
+.sb-sr-item:hover{background:rgba(74,158,255,0.08)}
+.sb-sr-name{color:#c8d8f0;font-size:12px;font-weight:600}
+.sb-sr-sub{color:#3a5570;font-size:10px;margin-top:1px}
+#sidebar.collapsed #sb-search-wrap{display:none}
+
+/* Stats in sidebar */
+#sb-stats{padding:8px 6px;display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:4px}
+.sb-stat{background:rgba(255,255,255,0.04);border-radius:8px;padding:7px 8px;text-align:center}
+.sb-stat-val{font-weight:800;font-size:14px}
+.sb-stat-lbl{color:#2a4060;font-size:9px;margin-top:1px}
+#sidebar.collapsed #sb-stats{display:none}
+
+/* Reminders in sidebar */
+#sb-reminders{padding:0 2px 8px}
+#sidebar.collapsed #sb-reminders{display:none}
+.sb-reminder-item{display:flex;justify-content:space-between;align-items:center;padding:6px 8px;border-radius:7px;cursor:pointer;transition:background 0.12s;margin-bottom:2px}
+.sb-reminder-item:hover{background:rgba(59,130,246,0.08)}
+.sb-reminder-name{color:#c8d8f0;font-size:11px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;margin-right:6px}
+.sb-reminder-date{color:#3b82f6;font-size:10px;font-weight:600;flex-shrink:0}
+
+/* Legend in sidebar */
+#sb-legend{padding:0 4px 8px}
+#sidebar.collapsed #sb-legend{display:none}
+.sb-legend-item{display:flex;align-items:center;gap:6px;margin-bottom:4px}
+.sb-legend-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.sb-legend-label{color:#3a5570;font-size:10px}
+
+/* ── MAIN AREA ── */
+#main{flex:1;position:relative;overflow:hidden;display:flex;flex-direction:column}
+
+
+/* AUTH */
+#auth-screen{position:fixed;inset:0;background:linear-gradient(145deg,#040c16,#06101a);z-index:1000;display:flex;align-items:center;justify-content:center}
+#auth-screen.hidden{display:none}
+#auth-box{background:linear-gradient(145deg,#0c1620,#111e2e);border:1px solid rgba(74,158,255,0.15);border-radius:20px;padding:36px 40px;width:400px;box-shadow:0 32px 80px rgba(0,0,0,0.7)}
+.auth-logo{width:48px;height:48px;border-radius:14px;background:linear-gradient(135deg,#1e6fcf,#0e4fa0);display:flex;align-items:center;justify-content:center;font-size:22px;margin:0 auto 20px}
+.auth-title{color:#e8f0ff;font-size:20px;font-weight:800;text-align:center;margin-bottom:4px}
+.auth-sub{color:#2a4060;font-size:12px;text-align:center;margin-bottom:28px}
+.auth-field{margin-bottom:14px}
+.auth-label{color:#4a6080;font-size:10px;text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:5px}
+.auth-input{width:100%;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:12px 14px;color:#e8f0ff;font-size:14px;outline:none;transition:border-color .2s}
+.auth-input:focus{border-color:rgba(74,158,255,0.4);background:rgba(74,158,255,0.05)}
+.auth-btn{width:100%;padding:13px;background:linear-gradient(135deg,#1e6fcf,#1a5cb8);border:none;border-radius:11px;color:#fff;font-weight:700;font-size:15px;cursor:pointer;margin-top:6px;box-shadow:0 4px 20px rgba(30,111,207,0.4)}
+.auth-btn:disabled{opacity:.5;cursor:not-allowed}
+.auth-err{color:#f87171;font-size:12px;margin-top:8px;text-align:center;min-height:18px}
+.auth-link{color:#4a9eff;font-size:12px;text-align:center;margin-top:14px;cursor:pointer}
+.auth-sms-info{background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.2);border-radius:10px;padding:12px;color:#34d399;font-size:12px;margin-bottom:14px;text-align:center}
+/* SYNC STATUS */
+#sync-status{position:absolute;bottom:16px;right:16px;z-index:25;font-size:10px;padding:4px 10px;border-radius:20px;font-weight:600;transition:all .3s}
+#sync-status.saved{background:rgba(16,185,129,0.12);color:#34d399;border:1px solid rgba(16,185,129,0.2)}
+#sync-status.saving{background:rgba(245,158,11,0.12);color:#fbbf24;border:1px solid rgba(245,158,11,0.2)}
+#sync-status.error{background:rgba(239,68,68,0.12);color:#f87171;border:1px solid rgba(239,68,68,0.2)}
+/* USER BAR */
+#sidebar.collapsed #user-bar{padding:8px 6px}
+#sidebar.collapsed #user-info span:last-child{display:none}
+#sidebar.collapsed #btn-logout{font-size:0;padding:7px 0}
+#sidebar.collapsed #btn-logout::after{content:'⏏';font-size:14px}
+
+/* TOPBAR */
+#topbar{position:absolute;top:0;left:0;right:0;z-index:20;padding:10px 16px;display:flex;align-items:center;justify-content:flex-end;background:linear-gradient(180deg,rgba(6,16,26,0.95) 60%,transparent);pointer-events:none;gap:6px}
+#topbar>*{pointer-events:auto}
+.stat-pill{padding:4px 10px;border-radius:8px;background:rgba(255,255,255,0.05);text-align:center}
+.stat-pill .val{font-weight:800;font-size:14px}
+.stat-pill .lbl{color:#2a4060;font-size:9px;font-weight:500}
+
+/* CANVAS */
+#canvas{width:100%;height:100%;cursor:grab}
+#canvas.panning{cursor:grabbing}
+
+/* ── CHATBOT ── */
+#chatbot-panel{position:fixed;right:0;top:0;bottom:0;width:380px;background:linear-gradient(180deg,#080f1a,#06101a);border-left:1px solid rgba(255,255,255,0.07);z-index:50;display:flex;flex-direction:column;transform:translateX(100%);transition:transform 0.3s cubic-bezier(.4,0,.2,1)}
+#chatbot-panel.open{transform:translateX(0)}
+#chatbot-header{padding:16px 18px;border-bottom:1px solid rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:space-between}
+#chatbot-title{color:#e8f0ff;font-weight:700;font-size:15px;display:flex;align-items:center;gap:8px}
+#chatbot-close{background:none;border:none;color:#4a6080;cursor:pointer;font-size:20px}
+#chatbot-messages{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px}
+.chat-msg{max-width:88%;padding:10px 14px;border-radius:12px;font-size:13px;line-height:1.5}
+.chat-msg.user{background:rgba(30,111,207,0.25);border:1px solid rgba(74,158,255,0.2);color:#c8d8f0;align-self:flex-end;border-radius:12px 12px 4px 12px}
+.chat-msg.ai{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);color:#a8c0d8;align-self:flex-start;border-radius:12px 12px 12px 4px}
+.chat-msg.system{background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.2);color:#34d399;align-self:center;font-size:11px;text-align:center;border-radius:8px}
+.chat-msg.thinking{color:#4a6080;font-style:italic;align-self:flex-start}
+#chatbot-input-area{padding:12px 16px;border-top:1px solid rgba(255,255,255,0.06)}
+#chatbot-attachments{display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap}
+.chat-attach-tag{background:rgba(74,158,255,0.12);border:1px solid rgba(74,158,255,0.2);border-radius:6px;padding:3px 8px;font-size:11px;color:#4a9eff;display:flex;align-items:center;gap:4px}
+.chat-attach-tag .rm{cursor:pointer;opacity:0.6}
+.chat-attach-tag .rm:hover{opacity:1}
+#chatbot-row{display:flex;gap:8px;align-items:flex-end}
+#chatbot-input{flex:1;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:10px 12px;color:#e8f0ff;font-size:13px;outline:none;font-family:'DM Sans',sans-serif;resize:none;max-height:100px;min-height:38px}
+#chatbot-input:focus{border-color:rgba(74,158,255,0.3)}
+#chatbot-send{background:linear-gradient(135deg,#1e6fcf,#1a5cb8);border:none;border-radius:9px;padding:10px 14px;color:#fff;cursor:pointer;font-size:16px;flex-shrink:0}
+#chatbot-file-btn{background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.1);border-radius:9px;padding:10px 12px;color:#4a9eff;cursor:pointer;font-size:15px;flex-shrink:0}
+#chatbot-file-input{display:none}
+
+/* Progress bar for bulk import */
+#import-progress{display:none;padding:10px 16px;border-top:1px solid rgba(255,255,255,0.06)}
+#import-progress-bar-wrap{background:rgba(255,255,255,0.06);border-radius:4px;height:4px;overflow:hidden}
+#import-progress-bar{height:100%;background:linear-gradient(90deg,#1e6fcf,#10b981);border-radius:4px;transition:width 0.2s;width:0%}
+#import-progress-text{color:#4a6080;font-size:11px;margin-top:5px}
+
+/* ── OVERLAY & MODAL (unchanged) ── */
+#overlay{position:fixed;inset:0;background:rgba(0,8,18,0.88);z-index:100;display:none;align-items:center;justify-content:center;backdrop-filter:blur(6px)}
+#overlay.show{display:flex}
+#modal{background:linear-gradient(145deg,#0c1620,#111e2e);border:1px solid rgba(100,180,255,0.12);border-radius:18px;padding:28px 32px;width:520px;max-height:88vh;overflow-y:auto;box-shadow:0 24px 80px rgba(0,0,0,0.7)}
+.modal-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px}
+.modal-title{color:#e8f0ff;font-size:17px;font-weight:700}
+.modal-badges{display:flex;gap:6px;margin-top:7px;flex-wrap:wrap}
+.badge{font-size:11px;padding:2px 8px;border-radius:20px}
+.badge-green{color:#10b981;background:rgba(16,185,129,0.12)}
+.badge-orange{color:#f59e0b;background:rgba(245,158,11,0.12)}
+.badge-blue{color:#4a9eff;background:rgba(74,158,255,0.12)}
+.modal-actions-top{display:flex;gap:8px;align-items:center}
+#btn-scanner{background:rgba(74,158,255,0.12);border:1px solid rgba(74,158,255,0.25);border-radius:8px;padding:6px 12px;color:#4a9eff;cursor:pointer;font-size:12px;font-weight:600;font-family:'DM Sans',sans-serif}
+.tabs{display:flex;gap:4px;margin-bottom:20px;background:rgba(255,255,255,0.04);border-radius:10px;padding:4px}
+.tab-btn{flex:1;padding:8px 0;border-radius:7px;border:none;cursor:pointer;font-size:12px;font-weight:600;font-family:'DM Sans',sans-serif;transition:all 0.2s;position:relative;background:transparent;color:#4a6080}
+.tab-btn.active{background:rgba(74,158,255,0.2);color:#4a9eff}
+.field-group{display:flex;flex-direction:column;gap:12px;margin-bottom:4px}
+.field-row{display:grid;gap:12px}
+.field-row.cols2{grid-template-columns:1fr 1fr}
+.field-row.cols13{grid-template-columns:1fr 2fr}
+.field-block{display:flex;flex-direction:column}
+.field-label{color:#4a6080;font-size:10px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px}
+.field-input{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:9px 12px;color:#e8f0ff;font-size:13px;outline:none;font-family:'DM Sans',sans-serif;width:100%;transition:border-color 0.2s}
+.field-input:focus{border-color:rgba(74,158,255,0.4);background:rgba(74,158,255,0.04)}
+textarea.field-input{resize:vertical}
+.status-row{display:flex;gap:6px}
+.status-btn{flex:1;padding:7px 4px;border-radius:8px;border:none;cursor:pointer;font-size:11px;font-weight:600;font-family:'DM Sans',sans-serif;transition:all 0.2s;background:rgba(255,255,255,0.07);color:#6b7c99}
+.status-btn.active-prospect{background:#f59e0b;color:#fff}
+.status-btn.active-actif{background:#10b981;color:#fff}
+.status-btn.active-recontacter{background:#3b82f6;color:#fff}
+.status-btn.active-perdu{background:#6b7280;color:#fff}
+#tab-produits{display:none}
+.prod-cat-title{color:#4a9eff;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px;margin-top:4px}
+.prod-item{display:flex;align-items:center;justify-content:space-between;padding:7px 12px;border-radius:8px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.06);margin-bottom:4px;transition:all 0.15s}
+.prod-item.vendu{background:rgba(16,185,129,0.1);border-color:rgba(16,185,129,0.25)}
+.prod-item.interet{background:rgba(245,158,11,0.08);border-color:rgba(245,158,11,0.2)}
+.prod-name{font-size:13px;color:#8899aa}
+.prod-item.vendu .prod-name{color:#34d399}
+.prod-item.interet .prod-name{color:#fbbf24}
+.prod-btns{display:flex;gap:5px}
+.prod-btn{padding:3px 9px;border-radius:6px;border:none;cursor:pointer;font-size:11px;font-weight:600;font-family:'DM Sans',sans-serif;transition:all 0.15s}
+.btn-vendu{background:rgba(16,185,129,0.1);color:#10b981}
+.btn-vendu.on{background:#10b981;color:#fff}
+.btn-interet{background:rgba(245,158,11,0.1);color:#f59e0b}
+.btn-interet.on{background:#f59e0b;color:#fff}
+#tab-qr{display:none}
+.qr-box{background:linear-gradient(135deg,#0a1828,#0d1e30);border:1px solid rgba(74,158,255,0.2);border-radius:18px;padding:24px;display:flex;flex-direction:column;align-items:center;gap:16px;margin-bottom:16px}
+.qr-img{border-radius:12px;display:block}
+.qr-label .ql1{color:#4a9eff;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em}
+.qr-label .ql2{color:#2a4060;font-size:11px;margin-top:4px}
+.qr-instructions{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:12px;padding:14px 16px;margin-bottom:16px}
+.qr-instructions .qi-title{color:#6b8099;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px}
+.qi-step{display:flex;gap:10px;align-items:flex-start;margin-bottom:8px}
+.qi-step .icon{font-size:15px}
+.qi-step .text{color:#8899aa;font-size:13px}
+.qr-link-row{margin-bottom:16px}
+.qr-link-row .qll{color:#4a6080;font-size:10px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px}
+.qr-link-box{display:flex;gap:8px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:9px;padding:8px 12px;align-items:center}
+.qr-link-text{flex:1;color:#4a6080;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#btn-copy-link{padding:4px 10px;background:rgba(74,158,255,0.15);border:none;border-radius:6px;color:#4a9eff;font-size:11px;cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:600;flex-shrink:0}
+.qr-status{display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:12px 16px}
+.qr-status-indicator{display:flex;align-items:center;gap:8px}
+.qr-pulse{width:8px;height:8px;border-radius:50%;background:#f59e0b;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+.qr-status-text{color:#6b8099;font-size:13px}
+#btn-check{padding:5px 12px;background:rgba(74,158,255,0.12);border:none;border-radius:7px;color:#4a9eff;font-size:11px;cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:600}
+.qr-received{background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.3);border-radius:12px;padding:16px;text-align:center}
+.qr-received .qr-rt{color:#34d399;font-weight:700;font-size:14px;margin-bottom:6px}
+.qr-received .qr-rs{color:#4a8070;font-size:12px;margin-bottom:14px}
+.modal-footer{display:flex;gap:10px;margin-top:24px}
+.btn-primary{flex:1;padding:11px 0;background:linear-gradient(135deg,#1e6fcf,#1a5cb8);border:none;border-radius:10px;color:#fff;font-weight:700;font-size:14px;cursor:pointer;font-family:'DM Sans',sans-serif;box-shadow:0 4px 16px rgba(30,111,207,0.35)}
+.btn-danger{padding:11px 16px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.25);border-radius:10px;color:#ef4444;font-size:14px;cursor:pointer;font-family:'DM Sans',sans-serif}
+.btn-ghost{padding:11px 16px;background:rgba(255,255,255,0.07);border:none;border-radius:10px;color:#6b7c99;font-size:14px;cursor:pointer;font-family:'DM Sans',sans-serif}
+.btn-green{width:100%;padding:11px 0;background:linear-gradient(135deg,#10b981,#059669);border:none;border-radius:10px;color:#fff;font-weight:700;font-size:14px;cursor:pointer;font-family:'DM Sans',sans-serif;box-shadow:0 4px 16px rgba(16,185,129,0.4)}
+#scanner-overlay{position:fixed;inset:0;background:rgba(0,8,18,0.92);z-index:200;display:none;align-items:center;justify-content:center;backdrop-filter:blur(8px)}
+#scanner-overlay.show{display:flex}
+#scanner-modal{background:linear-gradient(145deg,#0c1620,#111e2e);border:1px solid rgba(100,180,255,0.15);border-radius:20px;padding:32px;width:500px;max-height:88vh;overflow-y:auto;box-shadow:0 32px 80px rgba(0,0,0,0.7)}
+.scan-drop{border:2px dashed rgba(74,158,255,0.3);border-radius:14px;padding:40px 20px;text-align:center;cursor:pointer;background:rgba(74,158,255,0.04);transition:all 0.2s}
+.scan-drop:hover{background:rgba(74,158,255,0.08);border-color:rgba(74,158,255,0.5)}
+.scan-drop-icon{font-size:40px;margin-bottom:12px}
+.scan-drop-title{color:#c8d8f0;font-weight:600;margin-bottom:6px}
+.scan-drop-sub{color:#4a6080;font-size:12px}
+.scan-progress{margin-top:20px;text-align:center}
+.scan-progress-text{color:#4a9eff;font-size:14px;font-weight:600;margin-bottom:12px}
+.progress-bar{width:100%;height:3px;background:rgba(74,158,255,0.2);border-radius:2px;overflow:hidden}
+.progress-fill{height:100%;width:40%;background:#4a9eff;border-radius:2px;animation:slideProgress 1.5s infinite}
+@keyframes slideProgress{0%{margin-left:-40%}100%{margin-left:100%}}
+.scan-results-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:18px}
+.scan-result-item{background:rgba(255,255,255,0.04);border-radius:8px;padding:8px 12px}
+.scan-result-label{color:#4a6080;font-size:10px;text-transform:uppercase}
+.scan-result-value{color:#c8d8f0;font-size:13px;font-weight:500;margin-top:2px}
+.scan-footer{display:flex;gap:10px;margin-top:18px}
+#client-form-page{position:fixed;inset:0;background:linear-gradient(145deg,#06101a,#0c1e30);z-index:1100;display:none;overflow-y:auto}
+#client-form-page.show{display:block}
+.cf-header{background:linear-gradient(135deg,#0a1e36,#0e2a4a);border-bottom:1px solid rgba(74,158,255,0.1);padding:20px 24px 24px}
+.cf-logo{display:flex;align-items:center;gap:12px;margin-bottom:20px}
+.cf-logo-icon{width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,#1e6fcf,#0e4fa0);display:flex;align-items:center;justify-content:center;font-size:18px}
+.cf-logo-title{color:#e8f0ff;font-weight:800;font-size:15px}
+.cf-logo-sub{color:#2a5070;font-size:11px}
+.cf-progress{display:flex;gap:6px}
+.cf-step{flex:1}
+.cf-step-bar{height:3px;border-radius:3px;background:rgba(255,255,255,0.08);transition:background 0.3s}
+.cf-step-bar.done{background:#10b981}
+.cf-step-bar.active{background:#4a9eff}
+.cf-step-label{color:#2a5070;font-size:10px;font-weight:600;margin-top:5px;text-align:center;transition:color 0.3s}
+.cf-step-label.active{color:#4a9eff}
+.cf-step-label.done{color:#10b981}
+.cf-body{padding:28px 24px}
+.cf-step-title{color:#e8f0ff;font-size:20px;font-weight:800;margin-bottom:6px}
+.cf-step-sub{color:#3a5570;font-size:13px;margin-bottom:24px}
+.cf-field{margin-bottom:16px}
+.cf-label{color:#4a7090;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:7px}
+.cf-input{width:100%;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);border-radius:10px;padding:13px 16px;color:#f0f6ff;font-size:15px;outline:none;font-family:'DM Sans',sans-serif;transition:border-color 0.2s}
+.cf-input:focus{border-color:rgba(74,158,255,0.5);background:rgba(74,158,255,0.06)}
+.cf-select{width:100%;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);border-radius:10px;padding:13px 16px;color:#f0f6ff;font-size:15px;outline:none;font-family:'DM Sans',sans-serif;appearance:none;cursor:pointer}
+.cf-select option{background:#0c1620}
+.cf-nav{display:flex;gap:12px;margin-top:32px}
+.cf-btn-back{padding:14px 20px;background:rgba(255,255,255,0.07);border:none;border-radius:12px;color:#4a6080;font-size:15px;cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:600}
+.cf-btn-next{flex:1;padding:14px 0;background:linear-gradient(135deg,#1e6fcf,#1a5cb8);border:none;border-radius:12px;color:#fff;font-size:15px;cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:700;box-shadow:0 4px 20px rgba(30,111,207,0.4);transition:all 0.2s}
+.cf-btn-next:disabled{background:rgba(255,255,255,0.06);color:#3a5570;cursor:not-allowed;box-shadow:none}
+.cf-btn-submit{flex:1;padding:14px 0;background:linear-gradient(135deg,#10b981,#059669);border:none;border-radius:12px;color:#fff;font-size:15px;cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:700;box-shadow:0 4px 20px rgba(16,185,129,0.4)}
+.cf-privacy{color:#1e3a50;font-size:11px;text-align:center;margin-top:20px;line-height:1.6}
+.cf-success{min-height:100vh;display:flex;align-items:center;justify-content:center;flex-direction:column;text-align:center;padding:40px 24px}
+.cf-success-icon{font-size:64px;margin-bottom:20px}
+.cf-success-title{color:#e8f0ff;font-size:24px;font-weight:800;margin-bottom:12px}
+.cf-success-sub{color:#4a6080;font-size:15px;line-height:1.6;max-width:320px;margin:0 auto}
+.cf-success-badge{margin-top:32px;padding:14px 24px;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.25);border-radius:12px;color:#34d399;font-size:13px;font-weight:600}
+/* Chatbot toggle btn */
+#btn-chatbot{position:fixed;bottom:70px;right:24px;z-index:45;width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,#1e6fcf,#0e4fa0);border:none;color:#fff;font-size:22px;cursor:pointer;box-shadow:0 4px 20px rgba(30,111,207,0.5);transition:transform 0.2s}
+#btn-chatbot:hover{transform:scale(1.1)}
+#btn-chatbot.has-notif::after{content:'';position:absolute;top:4px;right:4px;width:10px;height:10px;border-radius:50%;background:#ef4444;border:2px solid #06101a}
+.action-type-btn{padding:4px 10px;border-radius:6px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.05);color:#6b8099;font-size:11px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s}
+.action-type-btn.active{background:rgba(74,158,255,0.2);border-color:rgba(74,158,255,0.4);color:#4a9eff}
+#dup-alert{position:fixed;top:80px;left:50%;transform:translateX(-50%);z-index:300;background:linear-gradient(135deg,#1a0e00,#251600);border:1px solid rgba(245,158,11,0.5);border-radius:14px;padding:16px 20px;min-width:340px;max-width:480px;box-shadow:0 8px 32px rgba(0,0,0,0.5);display:none;backdrop-filter:blur(8px)}
+#dup-alert.show{display:block;animation:slideDown .3s ease}
+@keyframes slideDown{0%{transform:translateX(-50%) translateY(-20px);opacity:0}100%{transform:translateX(-50%) translateY(0);opacity:1}}
+</style>
+</head>
+<body>
+
+<!-- AUTH SCREEN -->
+<div id="auth-screen">
+  <div id="auth-box">
+    <div class="auth-logo">🔗</div>
+    <div class="auth-title">Swiss Life Select</div>
+    <div class="auth-sub">CRM Réseau — Espace conseiller</div>
+    <div id="auth-login">
+      <div class="auth-field"><label class="auth-label">Email</label><input class="auth-input" id="auth-email" type="email" placeholder="conseiller@swisslife.ch" onkeydown="if(event.key==='Enter')authLogin()"></div>
+      <div class="auth-field"><label class="auth-label">Mot de passe</label><input class="auth-input" id="auth-password" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')authLogin()"></div>
+      <div class="auth-err" id="auth-err"></div>
+      <button class="auth-btn" id="auth-login-btn" onclick="authLogin()">Se connecter</button>
+      <div class="auth-link" onclick="showRegister()">Pas encore de compte ? Créer un compte</div>
+    </div>
+    <div id="auth-register" style="display:none">
+      <div class="auth-field"><label class="auth-label">Email</label><input class="auth-input" id="reg-email" type="email" placeholder="conseiller@swisslife.ch"></div>
+      <div class="auth-field"><label class="auth-label">Mot de passe (min. 8 car.)</label><input class="auth-input" id="reg-password" type="password" placeholder="••••••••"></div>
+      <div class="auth-field"><label class="auth-label">Téléphone (SMS 2FA)</label><input class="auth-input" id="reg-phone" type="tel" placeholder="+41 79 123 45 67"></div>
+      <div class="auth-err" id="reg-err"></div>
+      <button class="auth-btn" id="reg-btn" onclick="authRegister()">Créer mon compte</button>
+      <div class="auth-link" onclick="showLogin()">← Retour à la connexion</div>
+    </div>
+    <div id="auth-otp" style="display:none">
+      <div class="auth-sms-info">📧 Un code de vérification a été envoyé à votre email</div>
+      <div class="auth-field"><label class="auth-label">Code de vérification (8 chiffres)</label><input class="auth-input" id="otp-code" type="text" placeholder="12345678" maxlength="8" style="font-size:22px;letter-spacing:8px;text-align:center" onkeydown="if(event.key==='Enter')verifyOTP()"></div>
+      <div class="auth-err" id="otp-err"></div>
+      <button class="auth-btn" id="otp-btn" onclick="verifyOTP()">Vérifier</button>
+      <div class="auth-link" onclick="showLogin()">← Recommencer</div>
+    </div>
+  </div>
+</div>
+
+<!-- SIDEBAR -->
+<div id="sidebar">
+  <div id="sb-header">
+    <div id="sb-logo" onclick="toggleSidebar()" title="Réduire">🔗</div>
+    <div style="overflow:hidden">
+      <div id="sb-title">Swiss Life Select</div>
+      <div id="sb-sub">CRM Réseau</div>
+    </div>
+    <button id="sb-collapse" onclick="toggleSidebar()">◀</button>
+  </div>
+  <div id="sb-body">
+    <!-- SEARCH -->
+    <div class="sb-section">
+      <div class="sb-section-title"><span class="sb-section-title-text">Recherche</span></div>
+      <div id="sb-search-wrap">
+        <div id="sb-search-box">
+          <span id="sb-search-icon">🔍</span>
+          <input id="sb-search-input" type="text" placeholder="Nom, prénom…" oninput="handleSidebarSearch(this.value)">
+        </div>
+        <div id="sb-search-results"></div>
+      </div>
+    </div>
+    <!-- STATS -->
+    <div class="sb-section">
+      <div class="sb-section-title"><span class="sb-section-title-text">Statistiques</span></div>
+      <div id="sb-stats">
+        <div class="sb-stat"><div class="sb-stat-val" id="s-total" style="color:#4a9eff">0</div><div class="sb-stat-lbl">Contacts</div></div>
+        <div class="sb-stat"><div class="sb-stat-val" id="s-actif" style="color:#10b981">0</div><div class="sb-stat-lbl">Actifs</div></div>
+        <div class="sb-stat"><div class="sb-stat-val" id="s-prospect" style="color:#f59e0b">0</div><div class="sb-stat-lbl">Prospects</div></div>
+        <div class="sb-stat"><div class="sb-stat-val" id="s-produits" style="color:#a78bfa">0</div><div class="sb-stat-lbl">Produits</div></div>
+      </div>
+    </div>
+    <!-- NAVIGATION -->
+    <div class="sb-section">
+      <div class="sb-section-title"><span class="sb-section-title-text">Navigation</span></div>
+      <div class="sb-item active" id="nav-carte" onclick="showView('carte')"><span class="sb-icon">🗺️</span><span class="sb-label">Carte réseau</span></div>
+      <div class="sb-item" id="nav-tableau" onclick="showView('tableau')"><span class="sb-icon">📋</span><span class="sb-label">Tableau clients</span></div>
+      <div class="sb-item" id="nav-agenda" onclick="showView('agenda')"><span class="sb-icon">📅</span><span class="sb-label">Agenda</span></div>
+      <div class="sb-item" id="nav-kpis" onclick="showView('kpis')"><span class="sb-icon">📈</span><span class="sb-label">KPIs & Objectifs</span></div>
+      <div class="sb-item" id="nav-chatbot" onclick="showView('chatbot')"><span class="sb-icon">🤖</span><span class="sb-label">Assistant IA</span></div>
+    </div>
+    <!-- ACTIONS -->
+    <div class="sb-section">
+      <div class="sb-section-title"><span class="sb-section-title-text">Actions</span></div>
+      <div class="sb-item" onclick="triggerExcelImport()"><span class="sb-icon">📂</span><span class="sb-label">Importer fichier</span></div>
+      <div class="sb-item" onclick="resetView()"><span class="sb-icon">🎯</span><span class="sb-label">Centrer la vue</span></div>
+    </div>
+    <!-- REMINDERS -->
+    <div class="sb-section">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 6px 4px">
+        <div class="sb-section-title" style="padding:0"><span class="sb-section-title-text">Rappels à venir</span></div>
+        <button id="btn-add-reminder" onclick="openAddReminder()" style="background:rgba(74,158,255,0.12);border:1px solid rgba(74,158,255,0.2);border-radius:6px;padding:2px 8px;color:#4a9eff;font-size:11px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif">+ Ajouter</button>
+      </div>
+      <div id="sb-reminders"><div style="color:#2a4060;font-size:11px;padding:6px 8px">Aucun rappel</div></div>
+    </div>
+
+    <!-- ADD REMINDER MINI FORM -->
+    <div id="add-reminder-form" style="display:none;background:rgba(74,158,255,0.06);border:1px solid rgba(74,158,255,0.15);border-radius:10px;padding:12px;margin:0 4px 8px">
+      <div style="color:#4a9eff;font-size:11px;font-weight:700;margin-bottom:10px">🔔 Nouveau rappel</div>
+      <div style="margin-bottom:8px">
+        <div style="color:#4a6080;font-size:10px;text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px">Titre</div>
+        <input id="reminder-title" type="text" placeholder="Ex: Appeler M. Dupont" style="width:100%;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:7px;padding:7px 10px;color:#e8f0ff;font-size:12px;outline:none;font-family:'DM Sans',sans-serif">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+        <div>
+          <div style="color:#4a6080;font-size:10px;text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px">Date</div>
+          <input id="reminder-date" type="date" style="width:100%;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:7px;padding:7px 8px;color:#e8f0ff;font-size:12px;outline:none;font-family:'DM Sans',sans-serif;color-scheme:dark">
+        </div>
+        <div>
+          <div style="color:#4a6080;font-size:10px;text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px">Heure</div>
+          <input id="reminder-time" type="time" style="width:100%;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:7px;padding:7px 8px;color:#e8f0ff;font-size:12px;outline:none;font-family:'DM Sans',sans-serif;color-scheme:dark">
+        </div>
+      </div>
+      <div style="margin-bottom:10px">
+        <div style="color:#4a6080;font-size:10px;text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px">Note (optionnel)</div>
+        <input id="reminder-note" type="text" placeholder="Détails…" style="width:100%;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:7px;padding:7px 10px;color:#e8f0ff;font-size:12px;outline:none;font-family:'DM Sans',sans-serif">
+      </div>
+      <div style="display:flex;gap:6px">
+        <button onclick="saveReminder()" style="flex:1;padding:7px 0;background:linear-gradient(135deg,#1e6fcf,#1a5cb8);border:none;border-radius:7px;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif">Enregistrer</button>
+        <button onclick="closeAddReminder()" style="padding:7px 10px;background:rgba(255,255,255,0.07);border:none;border-radius:7px;color:#6b7c99;font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif">Annuler</button>
+      </div>
+    </div>
+    <!-- LEGEND -->
+    <div class="sb-section">
+      <div class="sb-section-title"><span class="sb-section-title-text">Légende</span></div>
+      <div id="sb-legend">
+        <div class="sb-legend-item"><div class="sb-legend-dot" style="background:#f59e0b"></div><span class="sb-legend-label">Prospect</span></div>
+        <div class="sb-legend-item"><div class="sb-legend-dot" style="background:#10b981"></div><span class="sb-legend-label">Client actif</span></div>
+        <div class="sb-legend-item"><div class="sb-legend-dot" style="background:#3b82f6"></div><span class="sb-legend-label">À recontacter</span></div>
+        <div class="sb-legend-item"><div class="sb-legend-dot" style="background:#6b7280"></div><span class="sb-legend-label">Inactif</span></div>
+        <div style="color:#2a4060;font-size:10px;margin-top:6px;padding:0 4px;line-height:1.7">Clic → fiche | + → ajouter<br>Glisser nœud | Fond → pan<br>📲 QR → formulaire client</div>
+      </div>
+    </div>
+  </div>
+  <!-- USER FOOTER -->
+  <div id="user-bar" style="display:none;padding:10px 8px;border-top:1px solid rgba(255,255,255,0.06);flex-direction:column;gap:6px">
+    <div id="user-info" style="display:flex;align-items:center;gap:6px;padding:6px 8px;background:rgba(255,255,255,0.04);border-radius:8px;overflow:hidden">
+      <span style="color:#10b981;font-size:10px;flex-shrink:0">🟢</span>
+      <span id="user-email" style="color:#6b8099;font-size:11px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1"></span>
+    </div>
+    <button id="btn-logout" onclick="authLogout()" style="width:100%;padding:7px 0;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.2);border-radius:8px;color:#ef4444;font-size:11px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif">Déconnexion</button>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div id="main">
+  <!-- TOPBAR (stats only) -->
+  <div id="topbar">
+    <div class="stat-pill" style="border:1px solid rgba(74,158,255,0.2)"><div class="val" id="stat-total" style="color:#4a9eff">0</div><div class="lbl">Contacts</div></div>
+    <div class="stat-pill" style="border:1px solid rgba(16,185,129,0.2)"><div class="val" id="stat-actif" style="color:#10b981">0</div><div class="lbl">Actifs</div></div>
+    <div class="stat-pill" style="border:1px solid rgba(245,158,11,0.2)"><div class="val" id="stat-prospect" style="color:#f59e0b">0</div><div class="lbl">Prospects</div></div>
+    <div class="stat-pill" style="border:1px solid rgba(167,139,250,0.2)"><div class="val" id="stat-produits" style="color:#a78bfa">0</div><div class="lbl">Produits</div></div>
+  </div>
+  <div id="sync-status" class="saved">☁ Sauvegardé</div>
+
+  <!-- VIEW: CARTE (default) -->
+  <div id="view-carte" style="position:absolute;inset:0">
+  <svg id="canvas" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <radialGradient id="bgGrad" cx="50%" cy="45%" r="60%">
+        <stop offset="0%" stop-color="#0a1828"/>
+        <stop offset="100%" stop-color="#06101a"/>
+      </radialGradient>
+      <filter id="glow">
+        <feGaussianBlur stdDeviation="4" result="b"/>
+        <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+      <pattern id="dotgrid" width="44" height="44" patternUnits="userSpaceOnUse">
+        <circle cx="0" cy="0" r="0.7" fill="rgba(74,158,255,0.07)"/>
+      </pattern>
+    </defs>
+    <rect width="100%" height="100%" fill="url(#bgGrad)"/>
+    <rect id="grid-bg" width="100%" height="100%" fill="url(#dotgrid)"/>
+    <g id="world"></g>
+  </svg>
+  </div><!-- end view-carte -->
+
+  <!-- VIEW: TABLEAU -->
+  <div id="view-tableau" style="display:none;position:absolute;inset:0;overflow-y:auto;padding:70px 20px 20px;background:#06101a">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div style="color:#e8f0ff;font-size:16px;font-weight:700">Tableau clients</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input id="tbl-search" type="text" placeholder="Rechercher…" oninput="renderTableau()" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:6px 12px;color:#e8f0ff;font-size:12px;outline:none;width:180px">
+        <select id="tbl-filter" onchange="renderTableau()" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:6px 10px;color:#e8f0ff;font-size:12px;outline:none;color-scheme:dark">
+          <option value="">Tous</option>
+          <option value="prospect">Prospects</option>
+          <option value="actif">Actifs</option>
+          <option value="recontacter">À recontacter</option>
+          <option value="perdu">Inactifs</option>
+        </select>
+      </div>
+    </div>
+    <div id="tableau-container" style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:12px;overflow:hidden"></div>
+  </div>
+
+  <!-- VIEW: AGENDA -->
+  <div id="view-agenda" style="display:none;position:absolute;inset:0;overflow-y:auto;padding:70px 20px 20px;background:#06101a">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div style="color:#e8f0ff;font-size:16px;font-weight:700" id="agenda-month-label"></div>
+      <div style="display:flex;gap:8px">
+        <button onclick="agendaNav(-1)" style="background:rgba(255,255,255,0.07);border:none;border-radius:8px;padding:6px 12px;color:#e8f0ff;cursor:pointer;font-size:14px">◀</button>
+        <button onclick="agendaNav(1)" style="background:rgba(255,255,255,0.07);border:none;border-radius:8px;padding:6px 12px;color:#e8f0ff;cursor:pointer;font-size:14px">▶</button>
+        <button onclick="openAddAgendaEvent()" style="background:linear-gradient(135deg,#1e6fcf,#1a5cb8);border:none;border-radius:8px;padding:6px 14px;color:#fff;cursor:pointer;font-size:12px;font-weight:600">+ Événement</button>
+      </div>
+    </div>
+    <!-- Calendar grid -->
+    <div id="agenda-grid" style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:12px;overflow:hidden"></div>
+    <!-- Upcoming events -->
+    <div style="margin-top:16px">
+      <div style="color:#4a6080;font-size:11px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Prochains événements</div>
+      <div id="agenda-events-list"></div>
+    </div>
+    <!-- Add event form -->
+    <div id="agenda-event-form" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:200;background:linear-gradient(145deg,#0c1620,#111e2e);border:1px solid rgba(74,158,255,0.2);border-radius:16px;padding:24px;width:380px;box-shadow:0 24px 80px rgba(0,0,0,0.7)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
+        <div style="color:#e8f0ff;font-size:15px;font-weight:700" id="agenda-form-title">Nouvel événement</div>
+        <button onclick="closeAgendaForm()" style="background:none;border:none;color:#4a6080;cursor:pointer;font-size:18px">✕</button>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div><div style="color:#4a6080;font-size:10px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Titre</div><input id="evt-title" type="text" placeholder="Ex: RDV M. Dupont" style="width:100%;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:8px 11px;color:#e8f0ff;font-size:13px;outline:none"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div><div style="color:#4a6080;font-size:10px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Date</div><input id="evt-date" type="date" style="width:100%;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:8px 11px;color:#e8f0ff;font-size:13px;outline:none;color-scheme:dark"></div>
+          <div><div style="color:#4a6080;font-size:10px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Heure</div><input id="evt-time" type="time" style="width:100%;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:8px 11px;color:#e8f0ff;font-size:13px;outline:none;color-scheme:dark"></div>
+        </div>
+        <div><div style="color:#4a6080;font-size:10px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Type</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <button class="evt-type-btn active" onclick="selectEvtType(this,'🤝 RDV')">🤝 RDV</button>
+            <button class="evt-type-btn" onclick="selectEvtType(this,'📞 Appel')">📞 Appel</button>
+            <button class="evt-type-btn" onclick="selectEvtType(this,'📄 Contrat')">📄 Contrat</button>
+            <button class="evt-type-btn" onclick="selectEvtType(this,'🎓 Formation')">🎓 Formation</button>
+            <button class="evt-type-btn" onclick="selectEvtType(this,'💼 Autre')">💼 Autre</button>
+          </div>
+        </div>
+        <div><div style="color:#4a6080;font-size:10px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Notes</div><textarea id="evt-notes" rows="2" placeholder="Détails…" style="width:100%;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:8px 11px;color:#e8f0ff;font-size:13px;outline:none;resize:none"></textarea></div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:16px">
+        <button onclick="saveAgendaEvent()" style="flex:1;padding:10px 0;background:linear-gradient(135deg,#1e6fcf,#1a5cb8);border:none;border-radius:9px;color:#fff;font-weight:700;font-size:13px;cursor:pointer">Enregistrer</button>
+        <button id="evt-delete-btn" onclick="deleteAgendaEvent()" style="display:none;padding:10px 14px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.25);border-radius:9px;color:#ef4444;font-size:13px;cursor:pointer">Supprimer</button>
+        <button onclick="closeAgendaForm()" style="padding:10px 14px;background:rgba(255,255,255,0.07);border:none;border-radius:9px;color:#6b7c99;font-size:13px;cursor:pointer">Annuler</button>
+      </div>
+    </div>
+    <div id="agenda-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:199" onclick="closeAgendaForm()"></div>
+  </div>
+
+  <!-- VIEW: KPIs -->
+  <div id="view-kpis" style="display:none;position:absolute;inset:0;overflow-y:auto;padding:70px 20px 20px;background:#06101a">
+    <div style="color:#e8f0ff;font-size:16px;font-weight:700;margin-bottom:20px">KPIs & Objectifs</div>
+    <!-- Stats cards -->
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:20px" id="kpi-stats"></div>
+    <!-- Objectifs -->
+    <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:12px;padding:16px;margin-bottom:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+        <div style="color:#e8f0ff;font-size:13px;font-weight:600">Objectifs du mois</div>
+        <button onclick="saveObjectifs()" style="background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.2);border-radius:7px;padding:4px 10px;color:#10b981;font-size:11px;font-weight:600;cursor:pointer">Sauvegarder</button>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px" id="objectifs-list"></div>
+    </div>
+    <!-- IA Insights -->
+    <div style="background:rgba(74,158,255,0.04);border:1px solid rgba(74,158,255,0.15);border-radius:12px;padding:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div style="color:#4a9eff;font-size:13px;font-weight:600">🤖 Analyse IA</div>
+        <button onclick="generateKpiInsights()" style="background:rgba(74,158,255,0.12);border:1px solid rgba(74,158,255,0.2);border-radius:7px;padding:4px 10px;color:#4a9eff;font-size:11px;font-weight:600;cursor:pointer">Analyser</button>
+      </div>
+      <div id="kpi-insights" style="color:#6b8099;font-size:12px;line-height:1.6">Cliquez "Analyser" pour obtenir une analyse IA de vos performances.</div>
+    </div>
+  </div>
+
+  <!-- VIEW: CHATBOT EMBEDDED -->
+  <div id="view-chatbot" style="display:none;position:absolute;inset:0;background:#06101a;display:none;flex-direction:column">
+    <div style="padding:70px 20px 0;flex-shrink:0">
+      <div style="color:#e8f0ff;font-size:16px;font-weight:700;margin-bottom:4px">🤖 Assistant IA</div>
+      <div style="color:#2a4060;font-size:11px">Swiss Life Select CRM</div>
+    </div>
+    <div id="chatbot-messages-embedded" style="flex:1;overflow-y:auto;padding:16px 20px;display:flex;flex-direction:column;gap:9px;margin-top:12px">
+      <div class="chat-msg ai">Bonjour ! Je peux :<br><br>• Importer un <b>Excel/CSV</b><br>• <b>Analyser</b> documents (CI, PDF)<br>• <b>Rechercher</b> des contacts<br>• Générer des <b>rapports</b><br>• Résumer la situation d'un client<br>• Suggérer des produits adaptés<br><br>Joignez un fichier ou posez une question !</div>
+    </div>
+    <div style="padding:12px 20px;border-top:1px solid rgba(255,255,255,0.06)">
+      <div id="chatbot-attachments-embedded" style="display:flex;gap:5px;margin-bottom:7px;flex-wrap:wrap"></div>
+      <div style="display:flex;gap:7px;align-items:flex-end">
+        <button onclick="document.getElementById('chatbot-file-input-emb').click()" style="background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:9px 11px;color:#4a9eff;cursor:pointer;font-size:13px;flex-shrink:0">📎</button>
+        <input type="file" id="chatbot-file-input-emb" accept=".xlsx,.xls,.csv,image/*,.pdf" style="display:none" onchange="handleChatbotFileEmb(this.files[0])">
+        <textarea id="chatbot-input-embedded" placeholder="Votre message…" rows="1" style="flex:1;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:9px;padding:9px 11px;color:#e8f0ff;font-size:12px;outline:none;font-family:'DM Sans',sans-serif;resize:none;max-height:90px;min-height:36px" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendEmbChatMessage();}"></textarea>
+        <button onclick="sendEmbChatMessage()" style="background:linear-gradient(135deg,#1e6fcf,#1a5cb8);border:none;border-radius:8px;padding:9px 13px;color:#fff;cursor:pointer;font-size:15px;flex-shrink:0">↑</button>
+      </div>
+    </div>
+  </div>
+
+</div><!-- end #main -->
+
+<!-- CHATBOT PANEL -->
+<div id="chatbot-panel">
+  <div id="chatbot-header">
+    <div id="chatbot-title">🤖 Assistant IA <span style="font-size:10px;color:#2a5070;font-weight:400;margin-left:4px">Swiss Life CRM</span></div>
+    <button id="chatbot-close" onclick="document.getElementById('chatbot-panel').classList.remove('open')">✕</button>
+  </div>
+  <div id="chatbot-messages">
+    <div class="chat-msg ai">Bonjour ! Je suis votre assistant CRM. Je peux :<br><br>
+    • <b>Créer des clients</b> depuis un Excel / CSV<br>
+    • <b>Analyser des documents</b> (CI, contrats)<br>
+    • <b>Rechercher</b> des contacts<br>
+    • <b>Générer des rapports</b><br><br>
+    Joignez un fichier ou posez-moi une question !</div>
+  </div>
+  <div id="import-progress">
+    <div id="import-progress-bar-wrap"><div id="import-progress-bar"></div></div>
+    <div id="import-progress-text">Import en cours…</div>
+  </div>
+  <div id="chatbot-input-area">
+    <div id="chatbot-attachments"></div>
+    <div id="chatbot-row">
+      <button id="chatbot-file-btn" onclick="document.getElementById('chatbot-file-input').click()" title="Joindre un fichier">📎</button>
+      <input type="file" id="chatbot-file-input" accept=".xlsx,.xls,.csv,image/*,.pdf" onchange="handleChatbotFile(this.files[0])">
+      <textarea id="chatbot-input" placeholder="Ex: Crée 5 prospects depuis mon fichier…" rows="1" onkeydown="chatKeydown(event)"></textarea>
+      <button id="chatbot-send" onclick="sendChatMessage()">↑</button>
+    </div>
+  </div>
+</div>
+
+<!-- CHATBOT TOGGLE BUTTON -->
+<button id="btn-chatbot" onclick="document.getElementById('chatbot-panel').classList.toggle('open')" title="Assistant IA">🤖</button>
+
+<!-- EXCEL IMPORT -->
+<input type="file" id="excel-file-input" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleExcelImport(this.files[0])">
+
+<!-- MODAL OVERLAY -->
+<div id="overlay" onclick="handleOverlayClick(event)">
+  <div id="modal">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title" id="modal-title">Contact</div>
+        <div class="modal-badges" id="modal-badges"></div>
+      </div>
+      <div class="modal-actions-top">
+        <button id="btn-scanner" onclick="openScanner()">📄 Scanner</button>
+        <button onclick="closeModal()" style="background:none;border:none;color:#4a6080;cursor:pointer;font-size:20px;padding:0">✕</button>
+      </div>
+    </div>
+    <div class="tabs" id="modal-tabs">
+      <button class="tab-btn active" id="tab-btn-infos" onclick="switchTab('infos')">👤 Infos</button>
+      <button class="tab-btn" id="tab-btn-produits" onclick="switchTab('produits')">📦 Produits</button>
+      <button class="tab-btn" id="tab-btn-histoire" onclick="switchTab('histoire')">📋 Historique</button>
+      <button class="tab-btn" id="tab-btn-qr" onclick="switchTab('qr')">📲 QR</button>
+    </div>
+    <div id="tab-infos">
+      <div class="field-group">
+        <div class="field-row cols2">
+          <div class="field-block"><label class="field-label">Prénom</label><input class="field-input" id="f-prenom" type="text"></div>
+          <div class="field-block"><label class="field-label">Nom</label><input class="field-input" id="f-nom" type="text"></div>
+        </div>
+        <div class="field-row cols2">
+          <div class="field-block"><label class="field-label">Téléphone</label><input class="field-input" id="f-tel" type="tel"></div>
+          <div class="field-block"><label class="field-label">Email</label><input class="field-input" id="f-email" type="email"></div>
+        </div>
+        <div class="field-row cols2">
+          <div class="field-block"><label class="field-label">Date naissance</label><input class="field-input" id="f-datenaissance" type="text" placeholder="JJ.MM.AAAA"></div>
+          <div class="field-block"><label class="field-label">N° AVS</label><input class="field-input" id="f-avs" type="text"></div>
+        </div>
+        <div class="field-block"><label class="field-label">Adresse</label><input class="field-input" id="f-adresse" type="text"></div>
+        <div class="field-row cols13">
+          <div class="field-block"><label class="field-label">NPA</label><input class="field-input" id="f-npa" type="text"></div>
+          <div class="field-block"><label class="field-label">Localité</label><input class="field-input" id="f-localite" type="text"></div>
+        </div>
+        <div class="field-row cols2">
+          <div class="field-block"><label class="field-label">Nationalité</label><input class="field-input" id="f-nationalite" type="text"></div>
+          <div class="field-block"><label class="field-label">État civil</label>
+            <select class="field-input" id="f-etatcivil">
+              <option value="">—</option>
+              <option>Célibataire</option><option>Marié(e)</option><option>Divorcé(e)</option><option>Veuf/Veuve</option><option>Partenariat enregistré</option>
+            </select>
+          </div>
+        </div>
+        <div class="field-row cols2">
+          <div class="field-block"><label class="field-label">Profession</label><input class="field-input" id="f-profession" type="text"></div>
+          <div class="field-block"><label class="field-label">Employeur</label><input class="field-input" id="f-employeur" type="text"></div>
+        </div>
+        <div class="field-block"><label class="field-label">Statut</label>
+          <div class="status-row">
+            <button class="status-btn" id="sb-prospect" onclick="setStatus('prospect')">Prospect</button>
+            <button class="status-btn" id="sb-actif" onclick="setStatus('actif')">Client actif</button>
+            <button class="status-btn" id="sb-recontacter" onclick="setStatus('recontacter')">À recontacter</button>
+            <button class="status-btn" id="sb-perdu" onclick="setStatus('perdu')">Inactif</button>
+          </div>
+        </div>
+        <div class="field-block" id="recall-field" style="display:none">
+          <label class="field-label">Date & heure de rappel</label>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <input class="field-input" id="f-recall" type="date" style="border-color:rgba(59,130,246,0.4);color-scheme:dark">
+            <input class="field-input" id="f-recall-time" type="time" style="border-color:rgba(59,130,246,0.4);color-scheme:dark">
+          </div>
+        </div>
+        <div class="field-block"><label class="field-label">Notes</label>
+          <textarea class="field-input" id="f-notes" rows="3" placeholder="Contexte, situation financière, prochaine étape…"></textarea>
+        </div>
+      </div>
+    </div>
+    <div id="tab-produits" style="display:none"></div>
+
+    <!-- TAB HISTORIQUE -->
+    <div id="tab-histoire" style="display:none">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+        <div style="color:#6b8099;font-size:12px">Toutes les interactions avec ce client</div>
+        <div style="display:flex;gap:6px">
+          <button onclick="planifierRDV()" style="background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.2);border-radius:7px;padding:5px 12px;color:#34d399;font-size:11px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif">📅 Planifier RDV</button>
+          <button onclick="openAddAction()" style="background:rgba(74,158,255,0.12);border:1px solid rgba(74,158,255,0.2);border-radius:7px;padding:5px 12px;color:#4a9eff;font-size:11px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif">+ Action</button>
+        </div>
+      </div>
+
+      <!-- PLANIFIER RDV FORM -->
+      <div id="planifier-rdv-form" style="display:none;background:rgba(16,185,129,0.05);border:1px solid rgba(16,185,129,0.2);border-radius:10px;padding:14px;margin-bottom:14px">
+        <div style="color:#34d399;font-size:11px;font-weight:700;margin-bottom:12px">📅 Nouveau rendez-vous</div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div>
+            <div style="color:#4a6080;font-size:10px;text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px">Titre du RDV</div>
+            <input id="rdv-title" type="text" placeholder="Ex: Présentation 3ème pilier" style="width:100%;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:7px;padding:8px 10px;color:#e8f0ff;font-size:12px;outline:none;font-family:'DM Sans',sans-serif">
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div>
+              <div style="color:#4a6080;font-size:10px;text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px">Date</div>
+              <input id="rdv-date" type="date" style="width:100%;background:rgba(255,255,255,0.05);border:1px solid rgba(16,185,129,0.3);border-radius:7px;padding:8px 10px;color:#e8f0ff;font-size:12px;outline:none;color-scheme:dark">
+            </div>
+            <div>
+              <div style="color:#4a6080;font-size:10px;text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px">Heure</div>
+              <input id="rdv-time" type="time" style="width:100%;background:rgba(255,255,255,0.05);border:1px solid rgba(16,185,129,0.3);border-radius:7px;padding:8px 10px;color:#e8f0ff;font-size:12px;outline:none;color-scheme:dark">
+            </div>
+          </div>
+          <div>
+            <div style="color:#4a6080;font-size:10px;text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px">Notes (optionnel)</div>
+            <textarea id="rdv-notes" rows="2" placeholder="Sujet, lieu, préparation…" style="width:100%;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:7px;padding:8px 10px;color:#e8f0ff;font-size:12px;outline:none;font-family:'DM Sans',sans-serif;resize:none"></textarea>
+          </div>
+          <div style="display:flex;gap:6px">
+            <button onclick="saveRDV()" style="flex:1;padding:8px 0;background:linear-gradient(135deg,#10b981,#059669);border:none;border-radius:7px;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif">✓ Ajouter au calendrier</button>
+            <button onclick="document.getElementById('planifier-rdv-form').style.display='none'" style="padding:8px 12px;background:rgba(255,255,255,0.07);border:none;border-radius:7px;color:#6b7c99;font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif">Annuler</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Add action form -->
+      <div id="add-action-form" style="display:none;background:rgba(74,158,255,0.05);border:1px solid rgba(74,158,255,0.15);border-radius:10px;padding:12px;margin-bottom:14px">
+        <div style="margin-bottom:8px">
+          <div style="color:#4a6080;font-size:10px;text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px">Type d'action</div>
+          <div style="display:flex;gap:5px;flex-wrap:wrap">
+            <button class="action-type-btn active" onclick="selectActionType(this,'📞 Appel')">📞 Appel</button>
+            <button class="action-type-btn" onclick="selectActionType(this,'📧 Email')">📧 Email</button>
+            <button class="action-type-btn" onclick="selectActionType(this,'🤝 RDV')">🤝 RDV</button>
+            <button class="action-type-btn" onclick="selectActionType(this,'📄 Contrat')">📄 Contrat</button>
+            <button class="action-type-btn" onclick="selectActionType(this,'💬 SMS')">💬 SMS</button>
+            <button class="action-type-btn" onclick="selectActionType(this,'📝 Note')">📝 Note</button>
+          </div>
+        </div>
+        <div style="margin-bottom:8px">
+          <div style="color:#4a6080;font-size:10px;text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px">Description</div>
+          <textarea id="action-desc" rows="2" placeholder="Ex: Appel de 15min, intéressé par le 3ème pilier A…" style="width:100%;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:7px;padding:8px 10px;color:#e8f0ff;font-size:12px;outline:none;font-family:'DM Sans',sans-serif;resize:none"></textarea>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button onclick="saveAction()" style="flex:1;padding:7px 0;background:linear-gradient(135deg,#1e6fcf,#1a5cb8);border:none;border-radius:7px;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif">Enregistrer</button>
+          <button onclick="document.getElementById('add-action-form').style.display='none'" style="padding:7px 12px;background:rgba(255,255,255,0.07);border:none;border-radius:7px;color:#6b7c99;font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif">Annuler</button>
+        </div>
+      </div>
+      <div id="actions-list"></div>
+    </div>
+
+    <!-- TAB QR -->
+    <div id="tab-qr" style="display:none">
+      <div class="qr-box">
+        <img id="qr-img" class="qr-img" width="180" height="180" alt="QR Code">
+        <div class="qr-label"><div class="ql1">Scanner pour remplir le formulaire</div><div class="ql2">Valable pour ce contact uniquement</div></div>
+      </div>
+      <div class="qr-instructions">
+        <div class="qi-title">Comment ça marche</div>
+        <div class="qi-step"><span class="icon">📱</span><span class="text">Le client scanne avec son smartphone</span></div>
+        <div class="qi-step"><span class="icon">✍️</span><span class="text">Il remplit son formulaire en 3 étapes</span></div>
+        <div class="qi-step"><span class="icon">⚡</span><span class="text">Les données arrivent ici automatiquement</span></div>
+        <div class="qi-step"><span class="icon">✅</span><span class="text">Vous importez en un clic</span></div>
+      </div>
+      <div class="qr-link-row">
+        <div class="qll">Ou partager le lien directement</div>
+        <div class="qr-link-box">
+          <span class="qr-link-text" id="qr-link-text"></span>
+          <button id="btn-copy-link" onclick="copyQRLink()">Copier</button>
+        </div>
+      </div>
+      <div id="qr-waiting" class="qr-status">
+        <div class="qr-status-indicator"><div class="qr-pulse"></div><span class="qr-status-text">En attente…</span></div>
+        <button id="btn-check" onclick="checkPending()">↻ Vérifier</button>
+      </div>
+      <div id="qr-received" class="qr-received" style="display:none">
+        <div class="qr-rt">🎉 Formulaire reçu !</div>
+        <div class="qr-rs" id="qr-received-name"></div>
+        <button class="btn-green" onclick="importQRData()">⬇ Importer dans la fiche</button>
+      </div>
+    </div>
+
+    <div class="modal-footer" id="modal-footer">
+      <button class="btn-primary" onclick="saveNode()">Enregistrer</button>
+      <button onclick="exportClientPDF()" style="padding:10px 14px;background:rgba(167,139,250,0.1);border:1px solid rgba(167,139,250,0.25);border-radius:9px;color:#a78bfa;font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif">📄 PDF</button>
+      <button class="btn-danger" onclick="deleteNode()">Supprimer</button>
+      <button class="btn-ghost" onclick="closeModal()">Fermer</button>
+    </div>
+  </div>
+</div>
+
+<!-- SCANNER OVERLAY -->
+<div id="scanner-overlay" onclick="handleScannerOverlayClick(event)">
+  <div id="scanner-modal">
+    <div class="modal-header">
+      <div><div class="modal-title">📄 Scanner un document</div><div style="color:#4a6080;font-size:12px;margin-top:4px">CI, permis, passeport, PDF</div></div>
+      <button onclick="closeScanner()" style="background:none;border:none;color:#4a6080;cursor:pointer;font-size:20px">✕</button>
+    </div>
+    <div id="scan-drop-zone" class="scan-drop" ondrop="handleFileDrop(event)" ondragover="event.preventDefault()" onclick="document.getElementById('scan-file-input').click()">
+      <div class="scan-drop-icon">📷</div>
+      <div class="scan-drop-title" id="scan-drop-title">Déposer ou cliquer pour uploader</div>
+      <div class="scan-drop-sub">JPG, PNG, PDF</div>
+      <input type="file" id="scan-file-input" accept="image/*,.pdf" style="display:none" onchange="handleFileSelect(this.files[0])">
+    </div>
+    <div id="scan-progress-wrap" class="scan-progress" style="display:none">
+      <div class="scan-progress-text">🔍 Analyse IA…</div>
+      <div class="progress-bar"><div class="progress-fill"></div></div>
+    </div>
+    <div id="scan-error" style="display:none;margin-top:16px;padding:12px 16px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:10px;color:#f87171;font-size:13px"></div>
+    <div id="scan-preview-wrap" style="display:none;margin-top:16px"><img id="scan-preview" style="width:100%;border-radius:10px;max-height:180px;object-fit:cover;opacity:0.7"></div>
+    <div id="scan-results-wrap" style="display:none;margin-top:20px">
+      <div style="color:#10b981;font-size:13px;font-weight:600;margin-bottom:14px">✅ Données extraites</div>
+      <div class="scan-results-grid" id="scan-results-grid"></div>
+      <div class="scan-footer">
+        <button class="btn-primary" onclick="applyScanData()">Utiliser →</button>
+        <button class="btn-ghost" onclick="resetScanner()">Rescanner</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- DUPLICATE ALERT -->
+<div id="dup-alert">
+  <div style="display:flex;align-items:flex-start;gap:12px">
+    <div style="font-size:22px">⚠️</div>
+    <div style="flex:1">
+      <div style="color:#fbbf24;font-weight:700;font-size:13px;margin-bottom:6px">Contact similaire détecté</div>
+      <div id="dup-msg" style="color:#92743a;font-size:12px;line-height:1.5;margin-bottom:12px"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button onclick="openDupNode()" style="padding:6px 14px;background:rgba(245,158,11,0.2);border:1px solid rgba(245,158,11,0.4);border-radius:7px;color:#fbbf24;font-size:12px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif">Voir le doublon</button>
+        <button onclick="dismissDup()" style="padding:6px 14px;background:rgba(255,255,255,0.07);border:none;border-radius:7px;color:#6b7c99;font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif">Créer quand même</button>
+        <button onclick="cancelDup()" style="padding:6px 14px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.2);border-radius:7px;color:#ef4444;font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif">Annuler</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- CLIENT FORM PAGE -->
+<div id="client-form-page"><div id="cf-content"></div></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// CONSTANTS & STATE
+// ═══════════════════════════════════════════════════════════════
+// ═══ SUPABASE ═══
+const{createClient}=supabase;
+const sb=createClient('https://hcakgtycthsnrbpzguyy.supabase.co','eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhjYWtndHljdGhzbnJicHpndXl5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyMTM3MTQsImV4cCI6MjA5MTc4OTcxNH0.jScxRW5c-SdV9UUM9UQfnx0tAX1Wyo57W7ypQpsMKqM');
+let currentUser=null,saveTimeout=null,realtimeChannel=null;
+
+// ═══ AUTH FUNCTIONS ═══
+function showLogin(){document.getElementById('auth-login').style.display='block';document.getElementById('auth-register').style.display='none';document.getElementById('auth-otp').style.display='none';}
+function showRegister(){document.getElementById('auth-login').style.display='none';document.getElementById('auth-register').style.display='block';document.getElementById('auth-otp').style.display='none';}
+function showOTP(){document.getElementById('auth-login').style.display='none';document.getElementById('auth-register').style.display='none';document.getElementById('auth-otp').style.display='block';}
+async function authLogin(){
+  const email=document.getElementById('auth-email').value.trim();
+  const pass=document.getElementById('auth-password').value;
+  const btn=document.getElementById('auth-login-btn');
+  if(!email||!pass){document.getElementById('auth-err').textContent='Remplis tous les champs.';return;}
+  btn.disabled=true;btn.textContent='Connexion…';document.getElementById('auth-err').textContent='';
+  const{data,error}=await sb.auth.signInWithPassword({email,password:pass});
+  if(error){document.getElementById('auth-err').textContent=error.message;btn.disabled=false;btn.textContent='Se connecter';return;}
+  await sb.auth.signOut();
+  const{error:otpErr}=await sb.auth.signInWithOtp({email,options:{shouldCreateUser:false}});
+  if(otpErr){document.getElementById('auth-err').textContent=otpErr.message;btn.disabled=false;btn.textContent='Se connecter';return;}
+  btn.disabled=false;btn.textContent='Se connecter';
+  document.getElementById('auth-otp').style.display='block';
+  document.getElementById('auth-login').style.display='none';
+  document.getElementById('otp-err').textContent='';
+  document.getElementById('auth-err').textContent='';
+  window._pendingEmail=email;
+}
+async function authRegister(){const email=document.getElementById('reg-email').value.trim();const pass=document.getElementById('reg-password').value;const phone=document.getElementById('reg-phone').value.trim();const btn=document.getElementById('reg-btn');if(!email||!pass){document.getElementById('reg-err').textContent='Email et mot de passe requis.';return;}if(pass.length<8){document.getElementById('reg-err').textContent='Mot de passe trop court (min. 8 caractères).';return;}btn.disabled=true;btn.textContent='Création…';document.getElementById('reg-err').textContent='';const{data,error}=await sb.auth.signUp({email,password:pass,options:{data:{phone}}});if(error){document.getElementById('reg-err').textContent=error.message;btn.disabled=false;btn.textContent='Créer mon compte';return;}document.getElementById('reg-err').style.color='#34d399';document.getElementById('reg-err').textContent='✅ Compte créé ! Vérifiez votre email pour confirmer.';btn.disabled=false;btn.textContent='Créer mon compte';setTimeout(()=>showLogin(),3000);}
+async function verifyOTP(){
+  const code=document.getElementById('otp-code').value.trim();
+  const btn=document.getElementById('otp-btn');
+  if(!code||code.length!==8){document.getElementById('otp-err').textContent='Code à 8 chiffres requis.';return;}
+  btn.disabled=true;btn.textContent='Vérification…';document.getElementById('otp-err').textContent='';
+  const email=window._pendingEmail||document.getElementById('auth-email').value.trim();
+  const{data,error}=await sb.auth.verifyOtp({email,token:code,type:'email'});
+  if(error){document.getElementById('otp-err').textContent=error.message;btn.disabled=false;btn.textContent='Vérifier';return;}
+  if(data.user)onAuthSuccess(data.user);
+}
+async function authLogout(){await sb.auth.signOut();currentUser=null;nodes=[];nodeMap={};document.getElementById('auth-screen').classList.remove('hidden');document.getElementById('user-bar').style.display='none';if(realtimeChannel)sb.removeChannel(realtimeChannel);renderCanvas();}
+function onAuthSuccess(user){currentUser=user;document.getElementById('auth-screen').classList.add('hidden');document.getElementById('user-bar').style.display='flex';document.getElementById('user-email').textContent=user.email;loadNodesFromDB();setupRealtime();}
+sb.auth.getSession().then(({data})=>{if(data.session?.user)onAuthSuccess(data.session.user);});
+
+// ═══ DATABASE ═══
+function setSyncStatus(t,x){const el=document.getElementById('sync-status');if(!el)return;el.className='';el.classList.add(t);el.textContent=x;}
+async function loadNodesFromDB(){setSyncStatus('saving','⏳ Chargement…');const{data,error}=await sb.from('nodes').select('*').eq('user_id',currentUser.id);if(error){setSyncStatus('error','❌ Erreur chargement');return;}if(!data||!data.length){nodes=[{id:'root',label:'MOI',x:window.innerWidth/2-128,y:window.innerHeight/2,isRoot:true,parentId:null,client:null,user_id:currentUser.id}];await saveAllToDB();}else{nodes=data.map(r=>({id:r.id,label:r.label,x:r.x,y:r.y,isRoot:!r.parent_id&&r.label==='MOI',parentId:r.parent_id,client:r.client,user_id:r.user_id}));}setSyncStatus('saved','☁ Sauvegardé');renderCanvas();}
+async function saveAllToDB(){if(!currentUser)return;setSyncStatus('saving','⏳ Sauvegarde…');const rows=nodes.map(n=>({id:n.id,user_id:currentUser.id,parent_id:n.parentId||null,x:n.x,y:n.y,label:n.label,client:n.client||null}));const{error}=await sb.from('nodes').upsert(rows,{onConflict:'id'});if(error){setSyncStatus('error','❌ Erreur');console.error(error);}else setSyncStatus('saved','☁ Sauvegardé');}
+async function deleteNodeFromDB(id){if(!currentUser)return;await sb.from('nodes').delete().eq('id',id).eq('user_id',currentUser.id);}
+function scheduleSave(){clearTimeout(saveTimeout);saveTimeout=setTimeout(saveAllToDB,1200);}
+function setupRealtime(){if(realtimeChannel)sb.removeChannel(realtimeChannel);realtimeChannel=sb.channel('pending-forms').on('postgres_changes',{event:'INSERT',schema:'public',table:'pending_forms'},payload=>{const d=payload.new;if(d.node_id===selectedNodeId&&d.data){pendingData=d.data;document.getElementById('qr-waiting').style.display='none';document.getElementById('qr-received').style.display='block';document.getElementById('qr-received-name').textContent=`${d.data.prenom||''} ${d.data.nom||''} a rempli ses informations`;}}).subscribe();}
+
+const STORAGE_KEY='swisslife_html_v1';
+const PENDING_PREFIX='swisslife_pending_';
+const storage={
+  get:(k)=>{try{const v=localStorage.getItem(k);return v?{value:v}:null;}catch(e){return null;}},
+  set:(k,v)=>{try{localStorage.setItem(k,String(v));return true;}catch(e){return false;}},
+  delete:(k)=>{try{localStorage.removeItem(k);return true;}catch(e){return false;}}
+};
+const PRODUCTS={'Assurances Vie':[{id:'vie_risque',label:'Assurance vie risque pur'},{id:'vie_mixte',label:'Assurance vie mixte'},{id:'vie_liee',label:'Assurance vie liée fonds'}],'Prévoyance':[{id:'p3a',label:'3ème pilier A (lié)'},{id:'p3b',label:'3ème pilier B (libre)'},{id:'lpp',label:'LPP / Caisse de pension'},{id:'rachat_lpp',label:'Rachat années LPP'}],'Assurances Personnes':[{id:'maladie',label:'Maladie complémentaire'},{id:'accidents',label:'Accidents'},{id:'invalidite',label:'Invalidité (AI)'},{id:'protection_revenu',label:'Protection du revenu'},{id:'deces',label:'Décès'}],'Assurances Biens':[{id:'rc',label:'RC (Responsabilité civile)'},{id:'menage',label:'Ménage'},{id:'batiment',label:'Bâtiment'},{id:'vehicule',label:'Véhicule'},{id:'voyage',label:'Voyage'}],'Investissements':[{id:'fonds_placement',label:'Fonds de placement'},{id:'etf',label:'ETF / Indiciel'},{id:'structured',label:'Produits structurés'},{id:'actions',label:'Actions / Obligations'}],'Immobilier':[{id:'hypotheque',label:'Hypothèque'},{id:'financement_immo',label:'Financement immobilier'},{id:'immo_indirect',label:'Investissement indirect'},{id:'amortissement',label:'Amortissement indirect (3a)'}],'Entreprise':[{id:'prevoyance_pro',label:'Prévoyance professionnelle'},{id:'rc_pro',label:'RC professionnelle'},{id:'indemnites',label:'Indemnités journalières'},{id:'succession',label:'Planification successorale'}]};
+const STATUS_COLORS={prospect:'#f59e0b',actif:'#10b981',recontacter:'#3b82f6',perdu:'#6b7280'};
+
+let nodes=[],nodeMap={},pan={x:0,y:0},zoom=1,dragging=null,dragOffset={x:0,y:0},isPanning=false,panStart={x:0,y:0},selectedNodeId=null,currentStatus='prospect',scanResult=null,pendingData=null,checkInterval=null,nodeCounter=Date.now();
+let chatbotAttachment=null;
+let sidebarCollapsed=false;
+
+// ═══════════════════════════════════════════════════════════════
+// SIDEBAR
+// ═══════════════════════════════════════════════════════════════
+function toggleSidebar(){
+  sidebarCollapsed=!sidebarCollapsed;
+  const sb=document.getElementById('sidebar');
+  const btn=document.getElementById('sb-collapse');
+  sb.classList.toggle('collapsed',sidebarCollapsed);
+  btn.textContent=sidebarCollapsed?'▶':'◀';
+  document.getElementById('btn-add-reminder').style.display=sidebarCollapsed?'none':'';
+  if(sidebarCollapsed) closeAddReminder();
+}
+function handleSidebarSearch(val){
+  const res=document.getElementById('sb-search-results');
+  if(val.length<2){res.innerHTML='';return;}
+  const matches=nodes.filter(n=>!n.isRoot&&`${n.client?.prenom||''} ${n.client?.nom||''} ${n.label}`.toLowerCase().includes(val.toLowerCase())).slice(0,8);
+  if(!matches.length){res.innerHTML=`<div style="color:#2a4060;font-size:11px;padding:6px 8px">Aucun résultat</div>`;return;}
+  res.innerHTML=matches.map(n=>`<div class="sb-sr-item" onclick="openModal('${n.id}')"><div class="sb-sr-name">${n.client?.prenom||''} ${n.client?.nom||n.label}</div><div class="sb-sr-sub">${n.client?.tel||n.client?.email||STATUS_COLORS[n.client?.status||'prospect']?'●':''} ${n.client?.status||'prospect'}</div></div>`).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// QR CLIENT FORM
+// ═══════════════════════════════════════════════════════════════
+const urlParams=new URLSearchParams(window.location.search);
+const formNodeId=urlParams.get('form');
+if(formNodeId){
+  // Client QR form — hide auth screen, show form directly, no login needed
+  document.getElementById('auth-screen').classList.add('hidden');
+  document.getElementById('client-form-page').classList.add('show');
+  renderClientForm(formNodeId);
+}
+function renderClientForm(nodeId){
+  let step=0,formData={prenom:'',nom:'',tel:'',email:'',dateNaissance:'',adresse:'',npa:'',localite:'',profession:'',employeur:'',nationalite:'',etatCivil:''};
+  const steps=[
+    {title:'Identité',icon:'👤',sub:'Étape 1 sur 3',fields:[{key:'prenom',label:'Prénom',type:'text',required:true},{key:'nom',label:'Nom',type:'text',required:true},{key:'dateNaissance',label:'Date naissance',type:'text',placeholder:'JJ.MM.AAAA'},{key:'nationalite',label:'Nationalité',type:'text'},{key:'etatCivil',label:'État civil',type:'select',options:['','Célibataire','Marié(e)','Divorcé(e)','Veuf/Veuve','Partenariat enregistré']}]},
+    {title:'Contact',icon:'📞',sub:'Étape 2 sur 3',fields:[{key:'tel',label:'Téléphone',type:'tel',required:true},{key:'email',label:'Email',type:'email'},{key:'adresse',label:'Adresse',type:'text'},{key:'npa',label:'NPA',type:'text'},{key:'localite',label:'Localité',type:'text'}]},
+    {title:'Profession',icon:'💼',sub:'Étape 3 sur 3',fields:[{key:'profession',label:'Profession',type:'text'},{key:'employeur',label:'Employeur',type:'text'}]}
+  ];
+
+  function canGoNext(){
+    const s=steps[step];
+    return s.fields.every(f=>!f.required||(formData[f.key]||'').trim());
+  }
+
+  function updateNextBtn(){
+    const btn=document.getElementById('cf-next-btn');
+    if(btn)btn.disabled=!canGoNext();
+  }
+
+  function render(){
+    const s=steps[step];
+    const prog=steps.map((st,i)=>`<div class="cf-step"><div class="cf-step-bar ${i<step?'done':i===step?'active':''}"></div><div class="cf-step-label ${i<step?'done':i===step?'active':''}">${st.icon} ${st.title}</div></div>`).join('');
+    const fields=s.fields.map(f=>{
+      if(f.type==='select'){
+        const opts=f.options.map(o=>`<option value="${o}" ${formData[f.key]===o?'selected':''}>${o||'— Sélectionner —'}</option>`).join('');
+        return `<div class="cf-field"><label class="cf-label">${f.label}</label><select class="cf-select" id="cf-${f.key}">${opts}</select></div>`;
+      }
+      return `<div class="cf-field"><label class="cf-label">${f.label}${f.required?' <span style="color:#f59e0b">*</span>':''}</label><input class="cf-input" id="cf-${f.key}" type="${f.type}" value="${formData[f.key]||''}" placeholder="${f.placeholder||''}"></div>`;
+    }).join('');
+    const isLast=step===steps.length-1;
+    document.getElementById('cf-content').innerHTML=`
+      <div class="cf-header">
+        <div class="cf-logo"><div class="cf-logo-icon">🔗</div><div><div class="cf-logo-title">Swiss Life Select</div><div class="cf-logo-sub">Formulaire client confidentiel</div></div></div>
+        <div class="cf-progress">${prog}</div>
+      </div>
+      <div class="cf-body">
+        <h2 class="cf-step-title">${s.icon} ${s.title}</h2>
+        <p class="cf-step-sub">${s.sub}</p>
+        ${fields}
+        <div class="cf-nav">
+          ${step>0?`<button class="cf-btn-back" id="cf-back-btn">← Retour</button>`:''}
+          ${isLast
+            ?`<button class="cf-btn-submit" id="cf-submit-btn">✓ Envoyer</button>`
+            :`<button class="cf-btn-next" id="cf-next-btn" ${canGoNext()?'':'disabled'}>Suivant →</button>`
+          }
+        </div>
+        <p class="cf-privacy">🔒 Données confidentielles — Swiss Life Select</p>
+      </div>`;
+
+    // Attach listeners ONCE after render — no re-render on input
+    s.fields.forEach(f=>{
+      const el=document.getElementById('cf-'+f.key);
+      if(!el)return;
+      if(f.type==='select'){
+        el.addEventListener('change',e=>{formData[f.key]=e.target.value;updateNextBtn();});
+      } else {
+        el.addEventListener('input',e=>{formData[f.key]=e.target.value;updateNextBtn();});
+      }
+    });
+    const backBtn=document.getElementById('cf-back-btn');
+    const nextBtn=document.getElementById('cf-next-btn');
+    const submitBtn=document.getElementById('cf-submit-btn');
+    if(backBtn)backBtn.addEventListener('click',()=>{step--;render();});
+    if(nextBtn)nextBtn.addEventListener('click',()=>{if(canGoNext()){step++;render();}});
+    if(submitBtn)submitBtn.addEventListener('click',cfSubmitHandler);
+  }
+
+  async function cfSubmitHandler(){
+    // Collect final values from DOM before submit
+    steps[step].fields.forEach(f=>{const el=document.getElementById('cf-'+f.key);if(el)formData[f.key]=el.value;});
+    const payload={...formData,nodeId,submittedAt:new Date().toISOString()};
+    try{await sb.from('pending_forms').insert({node_id:nodeId,data:payload});}catch(e){console.error(e);}
+    document.getElementById('cf-content').innerHTML=`<div class="cf-success"><div class="cf-success-icon">✅</div><h1 class="cf-success-title">Merci ${formData.prenom||''} !</h1><p class="cf-success-sub">Vos informations ont été transmises à votre conseiller Swiss Life Select.</p><div class="cf-success-badge">🔒 Données transmises de manière sécurisée</div></div>`;
+  }
+
+  render();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PERSISTENCE
+// ═══════════════════════════════════════════════════════════════
+function saveData(){scheduleSave();}
+function loadData(){
+  // Data is loaded from Supabase after auth — this is just a fallback
+  nodes=[{id:'root',label:'MOI',x:window.innerWidth/2-130,y:window.innerHeight/2,isRoot:true,parentId:null,client:null}];
+}
+function exportData(){
+  const blob=new Blob([JSON.stringify(nodes,null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`crm-swisslife-${new Date().toISOString().slice(0,10)}.json`;a.click();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// EXCEL / CSV IMPORT
+// ═══════════════════════════════════════════════════════════════
+function triggerExcelImport(){document.getElementById('excel-file-input').click();}
+
+async function handleExcelImport(file,chatMode=false){
+  if(!file)return;
+  const reader=new FileReader();
+  reader.onload=async(e)=>{
+    let rows=[];
+    try{
+      const wb=XLSX.read(e.target.result,{type:'binary'});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      rows=XLSX.utils.sheet_to_json(ws,{defval:''});
+    }catch(err){
+      if(chatMode)addChatMsg('ai','❌ Impossible de lire le fichier. Vérifiez le format.');
+      return;
+    }
+    if(!rows.length){if(chatMode)addChatMsg('ai','⚠️ Le fichier est vide.');return;}
+
+    // Map columns intelligently
+    const colMap={};
+    const sample=Object.keys(rows[0]).map(k=>k.toLowerCase());
+    const mapping={prenom:['prenom','prénom','firstname','first_name','first name','vorname'],nom:['nom','name','lastname','last_name','last name','nachname'],tel:['tel','telephone','téléphone','phone','mobile','handy','natel'],email:['email','mail','e-mail'],adresse:['adresse','address','strasse'],npa:['npa','plz','zip','postal'],localite:['localite','localité','city','ville','ort'],profession:['profession','job','metier','métier']};
+    Object.entries(mapping).forEach(([field,aliases])=>{
+      const origKeys=Object.keys(rows[0]);
+      const found=origKeys.find(k=>aliases.includes(k.toLowerCase()));
+      if(found)colMap[field]=found;
+    });
+
+    if(chatMode)addChatMsg('ai',`📊 Fichier lu : **${rows.length} lignes** détectées.\nColonnes reconnues : ${Object.keys(colMap).join(', ')||'auto'}\n\nCréation des bulles en cours…`);
+
+    // Import with progress
+    const progressWrap=document.getElementById('import-progress');
+    const progressBar=document.getElementById('import-progress-bar');
+    const progressText=document.getElementById('import-progress-text');
+    progressWrap.style.display='block';
+
+    const root=nodes.find(n=>n.isRoot);
+    const batchSize=10;
+    let dupCount=0;
+    for(let i=0;i<rows.length;i++){
+      const row=rows[i];
+      const client={
+        prenom:String(row[colMap.prenom]||row['Prénom']||row['prenom']||'').trim(),
+        nom:String(row[colMap.nom]||row['Nom']||row['nom']||row['Name']||'').trim(),
+        tel:String(row[colMap.tel]||row['Tel']||row['Téléphone']||'').trim(),
+        email:String(row[colMap.email]||row['Email']||row['email']||'').trim(),
+        adresse:String(row[colMap.adresse]||row['Adresse']||'').trim(),
+        npa:String(row[colMap.npa]||row['NPA']||'').trim(),
+        localite:String(row[colMap.localite]||row['Localité']||'').trim(),
+        profession:String(row[colMap.profession]||row['Profession']||'').trim(),
+        status:'prospect',
+        produitsVendus:[],produitsInterets:[],notes:'',recontacterDate:'',
+      };
+      const label=`${client.prenom} ${client.nom}`.trim()||`Contact ${i+1}`;
+      const angle=(i/rows.length)*Math.PI*2+(Math.random()-0.5)*0.5;
+      const dist=120+Math.floor(i/12)*90+(Math.random()*40);
+      const id='n'+nodeCounter++;
+      // Skip duplicates during bulk import
+      const dup=findDuplicate(label,client);
+      if(dup){dupCount++;continue;}
+      nodes.push({id,label,x:root.x+Math.cos(angle)*dist,y:root.y+Math.sin(angle)*dist,isRoot:false,parentId:'root',client});
+
+      // Update progress every batch
+      if(i%batchSize===0||i===rows.length-1){
+        const pct=Math.round(((i+1)/rows.length)*100);
+        progressBar.style.width=pct+'%';
+        progressText.textContent=`Import : ${i+1} / ${rows.length} contacts (${pct}%)`;
+        await new Promise(r=>setTimeout(r,0));
+        renderCanvas();
+      }
+    }
+    saveAllToDB();
+    progressWrap.style.display='none';
+    const imported=rows.length-dupCount;
+    if(chatMode)addChatMsg('system',`✅ ${imported} contacts importés !${dupCount>0?` (${dupCount} doublon${dupCount>1?'s':''} ignoré${dupCount>1?'s':''})`:''}`);
+    else alert(`✅ ${imported} contacts importés !${dupCount>0?`\n⚠️ ${dupCount} doublon${dupCount>1?'s':''} ignoré${dupCount>1?'s':''}.`:''}`);
+  };
+  reader.readAsBinaryString(file);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CHATBOT
+// ═══════════════════════════════════════════════════════════════
+let chatHistory=[];
+
+function addChatMsg(role,text){
+  const el=document.createElement('div');
+  el.className=`chat-msg ${role}`;
+  el.innerHTML=text.replace(/\*\*(.*?)\*\*/g,'<b>$1</b>').replace(/\n/g,'<br>');
+  document.getElementById('chatbot-messages').appendChild(el);
+  document.getElementById('chatbot-messages').scrollTop=99999;
+  return el;
+}
+
+function chatKeydown(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendChatMessage();}}
+
+function handleChatbotFile(file){
+  if(!file)return;
+  chatbotAttachment=file;
+  const tag=document.createElement('div');
+  tag.className='chat-attach-tag';
+  tag.innerHTML=`📎 ${file.name} <span class="rm" onclick="removeChatAttachment()">✕</span>`;
+  document.getElementById('chatbot-attachments').innerHTML='';
+  document.getElementById('chatbot-attachments').appendChild(tag);
+}
+function removeChatAttachment(){chatbotAttachment=null;document.getElementById('chatbot-attachments').innerHTML='';}
+
+async function sendChatMessage(){
+  const input=document.getElementById('chatbot-input');
+  const msg=input.value.trim();
+  if(!msg&&!chatbotAttachment)return;
+  input.value='';
+
+  if(msg)addChatMsg('user',msg);
+  const thinking=addChatMsg('thinking','⏳ Traitement…');
+
+  // Handle file attachment
+  if(chatbotAttachment){
+    const file=chatbotAttachment;
+    const isExcel=file.name.match(/\.(xlsx|xls|csv)$/i);
+    removeChatAttachment();
+
+    if(isExcel){
+      thinking.remove();
+      addChatMsg('ai',`📊 Fichier Excel détecté : **${file.name}**\nAnalyse et import en cours…`);
+      await handleExcelImport(file,true);
+      return;
+    }
+
+    // Image/PDF → scan
+    try{
+      const base64=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(',')[1]);r.onerror=rej;r.readAsDataURL(file);});
+      const isImg=file.type.startsWith('image/');
+      const content=isImg
+        ?[{type:'image',source:{type:'base64',media_type:file.type,data:base64}},{type:'text',text:`Tu es assistant CRM Swiss Life Select. L'utilisateur dit: "${msg||'Analyse ce document'}". Extrais toutes les données client utiles et réponds en français de manière conversationnelle. Si c'est une CI ou un document d'identité, extrais les données et propose de créer un nœud client. Format JSON si demandé explicitement, sinon réponse naturelle.`}]
+        :[{type:'document',source:{type:'base64',media_type:'application/pdf',data:base64}},{type:'text',text:`Tu es assistant CRM Swiss Life Select. L'utilisateur dit: "${msg||'Analyse ce document'}". Extrais toutes les données client utiles et réponds en français.`}];
+      const resp=await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1500,messages:[{role:'user',content}]})});
+      const data=await resp.json();
+      const text=(data.content||[]).map(i=>i.text||'').join('');
+      thinking.remove();
+      const aiMsg=addChatMsg('ai',text);
+      // Try to extract JSON and offer to create node
+      try{
+        const jsonMatch=text.match(/\{[\s\S]*"nom"[\s\S]*\}/);
+        if(jsonMatch){
+          const extracted=JSON.parse(jsonMatch[0]);
+          if(extracted.nom||extracted.prenom){
+            const btn=document.createElement('button');
+            btn.className='btn-primary';btn.style.cssText='margin-top:10px;padding:8px 14px;font-size:12px;width:100%';
+            btn.textContent='➕ Créer ce contact dans la carte';
+            btn.onclick=()=>{createNodeFromData(extracted);btn.textContent='✅ Créé !';btn.disabled=true;};
+            aiMsg.appendChild(btn);
+          }
+        }
+      }catch(e){}
+    }catch(err){thinking.remove();addChatMsg('ai','❌ Erreur lors de l\'analyse du fichier.');}
+    return;
+  }
+
+  // Text-only message → AI
+  chatHistory.push({role:'user',content:msg});
+
+  // Check for Excel/import intent without file
+  const lm=msg.toLowerCase();
+  if(lm.includes('importer')||lm.includes('excel')||lm.includes('csv')){
+    thinking.remove();
+    addChatMsg('ai','Pour importer un fichier Excel ou CSV, joignez le fichier avec le bouton 📎 et envoyez votre message. Je détecterai automatiquement les colonnes (Prénom, Nom, Téléphone, Email…) et créerai les bulles.');
+    return;
+  }
+
+  // Search intent
+  if(lm.includes('cherche')||lm.includes('trouve')||lm.includes('qui est')){
+    const searchTerm=msg.replace(/cherche|trouve|qui est|quel est/gi,'').trim();
+    const matches=nodes.filter(n=>!n.isRoot&&`${n.client?.prenom||''} ${n.client?.nom||''} ${n.label}`.toLowerCase().includes(searchTerm.toLowerCase())).slice(0,5);
+    thinking.remove();
+    if(matches.length){
+      const list=matches.map(n=>`• **${n.label}** — ${n.client?.tel||'pas de tél'} — ${STATUS_COLORS[n.client?.status||'prospect']?n.client?.status||'prospect':''}`).join('\n');
+      const aiMsg=addChatMsg('ai',`J'ai trouvé ${matches.length} contact(s) :\n${list}`);
+      matches.forEach(n=>{const btn=document.createElement('button');btn.style.cssText='margin:3px;padding:4px 10px;background:rgba(74,158,255,0.15);border:1px solid rgba(74,158,255,0.2);border-radius:6px;color:#4a9eff;font-size:11px;cursor:pointer';btn.textContent=`Ouvrir ${n.label}`;btn.onclick=()=>openModal(n.id);aiMsg.appendChild(document.createElement('br'));aiMsg.appendChild(btn);});
+    }else{addChatMsg('ai',`Aucun contact trouvé pour "${searchTerm}".`);}
+    return;
+  }
+
+  // Stats intent
+  if(lm.includes('statistique')||lm.includes('combien')||lm.includes('rapport')){
+    thinking.remove();
+    const clients=nodes.filter(n=>!n.isRoot);
+    const st={total:clients.length,actif:clients.filter(n=>n.client?.status==='actif').length,prospect:clients.filter(n=>!n.client||n.client.status==='prospect').length,recontacter:clients.filter(n=>n.client?.status==='recontacter').length,produits:clients.reduce((a,n)=>a+(n.client?.produitsVendus?.length||0),0)};
+    addChatMsg('ai',`📊 **Rapport CRM**\n\n• Total contacts : **${st.total}**\n• Clients actifs : **${st.actif}**\n• Prospects : **${st.prospect}**\n• À recontacter : **${st.recontacter}**\n• Produits vendus : **${st.produits}**\n\nTaux de conversion : **${st.total?Math.round(st.actif/st.total*100):0}%**`);
+    return;
+  }
+
+  // General AI response
+  try{
+    const sysPrompt=`Tu es un assistant CRM pour un conseiller Swiss Life Select en Suisse. Tu connais les produits (3ème pilier, LPP, assurances, placements, hypothèques). Tu réponds en français, de manière concise et utile. Le CRM contient ${nodes.filter(n=>!n.isRoot).length} contacts.`;
+    const resp=await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:800,system:sysPrompt,messages:chatHistory.slice(-8)})});
+    const data=await resp.json();
+    const text=(data.content||[]).map(i=>i.text||'').join('');
+    chatHistory.push({role:'assistant',content:text});
+    thinking.remove();
+    addChatMsg('ai',text);
+  }catch(e){thinking.remove();addChatMsg('ai','❌ Erreur de connexion.');}
+}
+
+function createNodeFromData(data){
+  const root=nodes.find(n=>n.isRoot);
+  const angle=Math.random()*Math.PI*2;
+  const id='n'+nodeCounter++;
+  const label=`${data.prenom||''} ${data.nom||''}`.trim()||'Nouveau';
+  nodes.push({id,label,x:root.x+Math.cos(angle)*150,y:root.y+Math.sin(angle)*150,isRoot:false,parentId:'root',client:{...data,status:'prospect',produitsVendus:[],produitsInterets:[],notes:'',recontacterDate:''}});
+  scheduleSave();renderCanvas();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CANVAS / NODES
+// ═══════════════════════════════════════════════════════════════
+function rebuildIndex(){nodeMap={};nodes.forEach(n=>nodeMap[n.id]=n);}
+function getDepth(nodeId){let d=0,cur=nodeMap[nodeId];while(cur&&cur.parentId){d++;cur=nodeMap[cur.parentId];}return d;}
+function getNodeColor(node){
+  if(node.isRoot)return{bg:'#0d2040',border:'#4a9eff',text:'#7ec8ff'};
+  const s=node.client?.status||'prospect';
+  return{prospect:{bg:'#1a1200',border:'#f59e0b',text:'#fbbf24'},actif:{bg:'#001a10',border:'#10b981',text:'#34d399'},recontacter:{bg:'#001020',border:'#3b82f6',text:'#60a5fa'},perdu:{bg:'#111318',border:'#6b7280',text:'#9ca3af'}}[s];
+}
+function renderCanvas(){
+  rebuildIndex();
+  const world=document.getElementById('world');
+  world.innerHTML='';
+  world.setAttribute('transform',`translate(${pan.x},${pan.y}) scale(${zoom})`);
+  document.getElementById('grid-bg').setAttribute('x',(pan.x/zoom)%44);
+  document.getElementById('grid-bg').setAttribute('y',(pan.y/zoom)%44);
+  nodes.filter(n=>n.parentId).forEach(node=>{
+    const parent=nodeMap[node.parentId];if(!parent)return;
+    const depth=getDepth(node.id);
+    const color=node.client?(STATUS_COLORS[node.client.status]||'#4a9eff'):'#2a4060';
+    const line=document.createElementNS('http://www.w3.org/2000/svg','line');
+    line.setAttribute('x1',parent.x);line.setAttribute('y1',parent.y);line.setAttribute('x2',node.x);line.setAttribute('y2',node.y);
+    line.setAttribute('stroke',color);line.setAttribute('stroke-width',depth===1?'1.5':'1');line.setAttribute('stroke-opacity','0.3');
+    if(depth>1)line.setAttribute('stroke-dasharray','5,5');
+    world.appendChild(line);
+  });
+  nodes.forEach(node=>{
+    const colors=getNodeColor(node);
+    const depth=getDepth(node.id);
+    const r=node.isRoot?38:depth===1?26:22;
+    const vendus=node.client?.produitsVendus?.length||0;
+    const hasReminder=node.client?.status==='recontacter'&&node.client?.recontacterDate;
+    const g=document.createElementNS('http://www.w3.org/2000/svg','g');
+    g.setAttribute('transform',`translate(${node.x},${node.y})`);g.style.cursor='pointer';
+    if(hasReminder){const ring=document.createElementNS('http://www.w3.org/2000/svg','circle');ring.setAttribute('r',r+10);ring.setAttribute('fill','none');ring.setAttribute('stroke','#3b82f6');ring.setAttribute('stroke-width','1');ring.setAttribute('stroke-opacity','0.35');ring.setAttribute('stroke-dasharray','4,3');g.appendChild(ring);}
+    const circle=document.createElementNS('http://www.w3.org/2000/svg','circle');
+    circle.setAttribute('r',r);circle.setAttribute('fill',colors.bg);circle.setAttribute('stroke',colors.border);circle.setAttribute('stroke-width',node.isRoot?'2.5':'1.5');
+    if(node.isRoot)circle.setAttribute('filter','url(#glow)');
+    circle.addEventListener('mousedown',e=>{e.stopPropagation();startDrag(e,node.id);});
+    circle.addEventListener('click',e=>{e.stopPropagation();if(!dragging)openModal(node.id);});
+    g.appendChild(circle);
+    const label=document.createElementNS('http://www.w3.org/2000/svg','text');
+    label.setAttribute('text-anchor','middle');label.setAttribute('dominant-baseline','middle');label.setAttribute('fill',colors.text);
+    label.setAttribute('font-size',node.isRoot?12:depth===1?10:9);label.setAttribute('font-weight',node.isRoot?800:600);label.setAttribute('font-family',"'DM Sans',sans-serif");label.style.pointerEvents='none';
+    label.textContent=node.label.length>12?node.label.slice(0,11)+'…':node.label;
+    g.appendChild(label);
+    if(!node.isRoot&&node.client){const dot=document.createElementNS('http://www.w3.org/2000/svg','circle');dot.setAttribute('cx',r-3);dot.setAttribute('cy',-(r-3));dot.setAttribute('r',4);dot.setAttribute('fill',STATUS_COLORS[node.client.status]||'#f59e0b');dot.setAttribute('stroke','#06101a');dot.setAttribute('stroke-width','1.5');dot.style.pointerEvents='none';g.appendChild(dot);}
+    if(vendus>0){const bg2=document.createElementNS('http://www.w3.org/2000/svg','circle');bg2.setAttribute('cx',-(r-3));bg2.setAttribute('cy',-(r-3));bg2.setAttribute('r',7);bg2.setAttribute('fill','#a78bfa');bg2.setAttribute('stroke','#06101a');bg2.setAttribute('stroke-width','1.5');bg2.style.pointerEvents='none';g.appendChild(bg2);const bt=document.createElementNS('http://www.w3.org/2000/svg','text');bt.setAttribute('x',-(r-3));bt.setAttribute('y',-(r-3));bt.setAttribute('text-anchor','middle');bt.setAttribute('dominant-baseline','middle');bt.setAttribute('fill','white');bt.setAttribute('font-size','8');bt.setAttribute('font-weight','700');bt.setAttribute('font-family',"'DM Sans',sans-serif");bt.style.pointerEvents='none';bt.textContent=vendus;g.appendChild(bt);}
+    const plusG=document.createElementNS('http://www.w3.org/2000/svg','g');plusG.setAttribute('transform',`translate(${r+4},0)`);plusG.style.cursor='pointer';
+    const plusBg=document.createElementNS('http://www.w3.org/2000/svg','circle');plusBg.setAttribute('r','9');plusBg.setAttribute('fill','rgba(30,111,207,0.9)');plusBg.setAttribute('stroke','rgba(74,158,255,0.35)');plusBg.setAttribute('stroke-width','1');plusG.appendChild(plusBg);
+    const plusT=document.createElementNS('http://www.w3.org/2000/svg','text');plusT.setAttribute('text-anchor','middle');plusT.setAttribute('dominant-baseline','middle');plusT.setAttribute('fill','white');plusT.setAttribute('font-size','14');plusT.setAttribute('font-weight','700');plusT.setAttribute('font-family',"'DM Sans',sans-serif");plusT.style.pointerEvents='none';plusT.textContent='+';plusG.appendChild(plusT);
+    plusG.addEventListener('mousedown',e=>e.stopPropagation());
+    plusG.addEventListener('click',e=>{e.stopPropagation();addChild(node.id);});
+    g.appendChild(plusG);
+    world.appendChild(g);
+  });
+  updateStats();updateReminders();
+}
+function startDrag(e,id){if(e.button!==0)return;const node=nodeMap[id];dragging=id;dragOffset={x:e.clientX-pan.x-node.x*zoom,y:e.clientY-pan.y-node.y*zoom};}
+document.getElementById('canvas').addEventListener('mousedown',e=>{if(e.button===0&&!dragging){isPanning=true;panStart={x:e.clientX-pan.x,y:e.clientY-pan.y};document.getElementById('canvas').classList.add('panning');}});
+document.addEventListener('mousemove',e=>{if(dragging){const node=nodeMap[dragging];if(node){node.x=(e.clientX-pan.x-dragOffset.x)/zoom;node.y=(e.clientY-pan.y-dragOffset.y)/zoom;renderCanvas();}}else if(isPanning){pan.x=e.clientX-panStart.x;pan.y=e.clientY-panStart.y;renderCanvas();}});
+document.addEventListener('mouseup',()=>{if(dragging){saveData();dragging=null;}isPanning=false;document.getElementById('canvas').classList.remove('panning');});
+
+// ── WHEEL ZOOM (mouse) ──
+document.getElementById('canvas').addEventListener('wheel',e=>{
+  e.preventDefault();
+  const rect=document.getElementById('canvas').getBoundingClientRect();
+  const mx=e.clientX-rect.left;
+  const my=e.clientY-rect.top;
+  const delta=e.deltaY>0?0.9:1.1;
+  const newZoom=Math.min(Math.max(zoom*delta,0.2),4);
+  pan.x=mx-(mx-pan.x)*(newZoom/zoom);
+  pan.y=my-(my-pan.y)*(newZoom/zoom);
+  zoom=newZoom;
+  renderCanvas();
+},{passive:false});
+
+// ── PINCH ZOOM (touch) ──
+let lastTouchDist=null;
+let lastTouchMid=null;
+document.getElementById('canvas').addEventListener('touchstart',e=>{
+  if(e.touches.length===2){
+    lastTouchDist=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
+    lastTouchMid={x:(e.touches[0].clientX+e.touches[1].clientX)/2,y:(e.touches[0].clientY+e.touches[1].clientY)/2};
+    e.preventDefault();
+  }
+},{passive:false});
+document.getElementById('canvas').addEventListener('touchmove',e=>{
+  if(e.touches.length===2&&lastTouchDist){
+    e.preventDefault();
+    const dist=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
+    const mid={x:(e.touches[0].clientX+e.touches[1].clientX)/2,y:(e.touches[0].clientY+e.touches[1].clientY)/2};
+    const rect=document.getElementById('canvas').getBoundingClientRect();
+    const mx=mid.x-rect.left;
+    const my=mid.y-rect.top;
+    const delta=dist/lastTouchDist;
+    const newZoom=Math.min(Math.max(zoom*delta,0.2),4);
+    pan.x=mx-(mx-pan.x)*(newZoom/zoom);
+    pan.y=my-(my-pan.y)*(newZoom/zoom);
+    zoom=newZoom;
+    lastTouchDist=dist;
+    lastTouchMid=mid;
+    renderCanvas();
+  }
+},{passive:false});
+document.getElementById('canvas').addEventListener('touchend',e=>{if(e.touches.length<2){lastTouchDist=null;lastTouchMid=null;}});
+function addChild(parentId){const parent=nodeMap[parentId];const angle=Math.random()*Math.PI*2;const id='n'+nodeCounter++;nodes.push({id,label:'Nouveau',x:parent.x+Math.cos(angle)*140,y:parent.y+Math.sin(angle)*140,isRoot:false,parentId,client:null});scheduleSave();renderCanvas();openModal(id);}
+async function deleteNode(){const toDelete=new Set();function collect(id){toDelete.add(id);nodes.filter(n=>n.parentId===id).forEach(c=>collect(c.id));}collect(selectedNodeId);for(const id of toDelete)await deleteNodeFromDB(id);nodes=nodes.filter(n=>!toDelete.has(n.id));renderCanvas();closeModal();}
+function resetView(){
+  const root=nodes.find(n=>n.isRoot);
+  if(root){
+    const main=document.getElementById('main');
+    const w=main?main.clientWidth:window.innerWidth;
+    const h=main?main.clientHeight:window.innerHeight;
+    pan={x:w/2-root.x,y:h/2-root.y};
+  }else{pan={x:0,y:0};}
+  zoom=1;renderCanvas();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MODAL
+// ═══════════════════════════════════════════════════════════════
+function openModal(id){
+  selectedNodeId=id;
+  rebuildIndex();
+  const node=nodeMap[id]||nodes.find(n=>n.id===id);
+  const c=node.client||{};
+  document.getElementById('modal-title').textContent=node.isRoot?'Mon profil':(c.prenom||c.nom?`${c.prenom||''} ${c.nom||''}`.trim():'Nouveau contact');
+  updateModalBadges(node);
+  document.getElementById('modal-tabs').style.display=node.isRoot?'none':'flex';
+  document.getElementById('btn-scanner').style.display=node.isRoot?'none':'block';
+  document.getElementById('modal-footer').innerHTML=node.isRoot
+    ?`<button class="btn-ghost" onclick="closeModal()">Fermer</button>`
+    :`<button class="btn-primary" onclick="saveNode()">Enregistrer</button><button onclick="exportClientPDF()" style="padding:10px 14px;background:rgba(167,139,250,0.1);border:1px solid rgba(167,139,250,0.25);border-radius:9px;color:#a78bfa;font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif">📄 PDF</button><button class="btn-danger" onclick="deleteNode()">Supprimer</button><button class="btn-ghost" onclick="closeModal()">Fermer</button>`;
+  if(!node.isRoot){
+    ['prenom','nom','tel','email','avs','adresse','npa','localite','nationalite','profession','employeur'].forEach(k=>{const el=document.getElementById('f-'+k);if(el)el.value=c[k]||'';});
+    document.getElementById('f-datenaissance').value=c.dateNaissance||'';
+    document.getElementById('f-etatcivil').value=c.etatCivil||'';
+    document.getElementById('f-notes').value=c.notes||'';
+    document.getElementById('f-recall').value=c.recontacterDate||'';
+    document.getElementById('f-recall-time').value=c.recontacterTime||'';
+    setStatus(c.status||'prospect',false);
+    buildProductsTab(node);setupQRTab(node);switchTab('infos');
+  }
+  document.getElementById('overlay').classList.add('show');
+}
+function updateModalBadges(node){const c=node.client||{};const v=c.produitsVendus?.length||0;const i=c.produitsInterets?.length||0;let html='';if(v>0)html+=`<span class="badge badge-green">${v} vendu${v>1?'s':''}</span>`;if(i>0)html+=`<span class="badge badge-orange">${i} intérêt${i>1?'s':''}</span>`;document.getElementById('modal-badges').innerHTML=html;}
+function closeModal(){document.getElementById('overlay').classList.remove('show');if(checkInterval){clearInterval(checkInterval);checkInterval=null;}selectedNodeId=null;pendingData=null;}
+function handleOverlayClick(e){if(e.target===document.getElementById('overlay'))closeModal();}
+function switchTab(tab){['infos','produits','histoire','qr'].forEach(t=>{document.getElementById('tab-'+t).style.display=t===tab?'block':'none';const btn=document.getElementById('tab-btn-'+t);if(btn)btn.classList.toggle('active',t===tab);});if(tab==='histoire')renderActions();}
+function setStatus(s,save=false){currentStatus=s;['prospect','actif','recontacter','perdu'].forEach(st=>{const btn=document.getElementById('sb-'+st);btn.className='status-btn'+(st===s?' active-'+st:'');});document.getElementById('recall-field').style.display=s==='recontacter'?'block':'none';if(save)saveNode();}
+function saveNode(){
+  const node=nodeMap[selectedNodeId]||nodes.find(n=>n.id===selectedNodeId);
+  if(!node||node.isRoot){closeModal();return;}
+  const prenom=document.getElementById('f-prenom').value.trim();
+  const nom=document.getElementById('f-nom').value.trim();
+  const tel=document.getElementById('f-tel').value.trim();
+  const email=document.getElementById('f-email').value.trim();
+  const allProds=Object.values(PRODUCTS).flat();
+  const produitsVendus=[],produitsInterets=[];
+  allProds.forEach(p=>{const vBtn=document.getElementById('pv-'+p.id);const iBtn=document.getElementById('pi-'+p.id);if(vBtn&&vBtn.classList.contains('on'))produitsVendus.push(p.id);if(iBtn&&iBtn.classList.contains('on'))produitsInterets.push(p.id);});
+  const newClient={prenom,nom,tel,email,dateNaissance:document.getElementById('f-datenaissance').value,avs:document.getElementById('f-avs').value,adresse:document.getElementById('f-adresse').value,npa:document.getElementById('f-npa').value,localite:document.getElementById('f-localite').value,nationalite:document.getElementById('f-nationalite').value,etatCivil:document.getElementById('f-etatcivil').value,profession:document.getElementById('f-profession').value,employeur:document.getElementById('f-employeur').value,notes:document.getElementById('f-notes').value,status:currentStatus,recontacterDate:document.getElementById('f-recall').value,recontacterTime:document.getElementById('f-recall-time').value,produitsVendus,produitsInterets,actions:node.client?.actions||[]};
+  // Duplicate check — only for new/unnamed nodes
+  if(!node.client&&(prenom||nom||tel||email)){
+    const dup=findDuplicate(''+(prenom+' '+nom).trim(),newClient);
+    if(dup&&dup.id!==node.id){
+      showDupAlert(dup,()=>{node.label=(prenom||nom)?`${prenom} ${nom}`.trim():'Nouveau';node.client=newClient;scheduleSave();renderCanvas();closeModal();});
+      return;
+    }
+  }
+  node.label=(prenom||nom)?`${prenom} ${nom}`.trim():'Nouveau';
+  node.client=newClient;
+  scheduleSave();renderCanvas();closeModal();
+}
+function buildProductsTab(node){
+  const c=node.client||{};const vendus=c.produitsVendus||[];const interets=c.produitsInterets||[];
+  let html=`<div style="display:flex;gap:12px;margin-bottom:12px"><div style="display:flex;align-items:center;gap:6px"><div style="width:10px;height:10px;border-radius:3px;background:#10b981"></div><span style="color:#6b8099;font-size:12px">Vendu</span></div><div style="display:flex;align-items:center;gap:6px"><div style="width:10px;height:10px;border-radius:3px;background:#f59e0b"></div><span style="color:#6b8099;font-size:12px">À proposer</span></div></div>`;
+  Object.entries(PRODUCTS).forEach(([cat,items])=>{html+=`<div class="prod-cat-title">${cat}</div>`;items.forEach(item=>{const isV=vendus.includes(item.id),isI=interets.includes(item.id);html+=`<div class="prod-item ${isV?'vendu':isI?'interet':''}" id="prod-row-${item.id}"><span class="prod-name">${item.label}</span><div class="prod-btns"><button class="prod-btn btn-vendu ${isV?'on':''}" id="pv-${item.id}" onclick="toggleProd('${item.id}','vendu')">✓ Vendu</button><button class="prod-btn btn-interet ${isI?'on':''}" id="pi-${item.id}" onclick="toggleProd('${item.id}','interet')">★ Intérêt</button></div></div>`;});});
+  document.getElementById('tab-produits').innerHTML=html;
+}
+function toggleProd(id,type){const btn=document.getElementById(type==='vendu'?'pv-'+id:'pi-'+id);const row=document.getElementById('prod-row-'+id);btn.classList.toggle('on');const isV=document.getElementById('pv-'+id).classList.contains('on');const isI=document.getElementById('pi-'+id).classList.contains('on');row.className='prod-item'+(isV?' vendu':isI?' interet':'');row.querySelector('.prod-name').style.color=isV?'#34d399':isI?'#fbbf24':'#8899aa';}
+function setupQRTab(node){const baseUrl=window.location.href.split('?')[0];const formUrl=`${baseUrl}?form=${node.id}`;const qrApiUrl=`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(formUrl)}&bgcolor=0a1828&color=4a9eff&qzone=2&format=png`;document.getElementById('qr-img').src=qrApiUrl;document.getElementById('qr-link-text').textContent=formUrl;pendingData=null;document.getElementById('qr-waiting').style.display='flex';document.getElementById('qr-received').style.display='none';checkPending();if(checkInterval)clearInterval(checkInterval);checkInterval=setInterval(checkPending,5000);}
+function copyQRLink(){const node=nodeMap[selectedNodeId];if(!node)return;const url=`${window.location.href.split('?')[0]}?form=${node.id}`;navigator.clipboard?.writeText(url);const btn=document.getElementById('btn-copy-link');btn.textContent='✓ Copié!';setTimeout(()=>btn.textContent='Copier',2000);}
+async function checkPending(){if(!selectedNodeId||!currentUser)return;const{data}=await sb.from('pending_forms').select('*').eq('node_id',selectedNodeId).order('created_at',{ascending:false}).limit(1);if(data&&data.length&&data[0].data){pendingData=data[0].data;document.getElementById('qr-waiting').style.display='none';document.getElementById('qr-received').style.display='block';document.getElementById('qr-received-name').textContent=`${pendingData.prenom||''} ${pendingData.nom||''} a rempli ses informations`;}}
+async function importQRData(){if(!pendingData||!selectedNodeId)return;['prenom','nom','tel','email','adresse','npa','localite','nationalite','profession','employeur'].forEach(k=>{const el=document.getElementById('f-'+k);if(el&&pendingData[k])el.value=pendingData[k];});if(pendingData.dateNaissance)document.getElementById('f-datenaissance').value=pendingData.dateNaissance;if(pendingData.etatCivil)document.getElementById('f-etatcivil').value=pendingData.etatCivil;await sb.from('pending_forms').delete().eq('node_id',selectedNodeId);pendingData=null;document.getElementById('qr-waiting').style.display='flex';document.getElementById('qr-received').style.display='none';const badges=document.getElementById('modal-badges');if(!badges.querySelector('.badge-blue'))badges.innerHTML+=`<span class="badge badge-blue">✓ QR importé</span>`;switchTab('infos');}
+
+// ═══════════════════════════════════════════════════════════════
+// SCANNER
+// ═══════════════════════════════════════════════════════════════
+let scanResult2=null;
+function openScanner(){document.getElementById('scanner-overlay').classList.add('show');resetScanner();}
+function closeScanner(){document.getElementById('scanner-overlay').classList.remove('show');}
+function handleScannerOverlayClick(e){if(e.target===document.getElementById('scanner-overlay'))closeScanner();}
+function handleFileDrop(e){e.preventDefault();handleFileSelect(e.dataTransfer.files[0]);}
+function resetScanner(){scanResult2=null;document.getElementById('scan-drop-zone').style.display='block';document.getElementById('scan-drop-title').textContent='Déposer ou cliquer';document.getElementById('scan-progress-wrap').style.display='none';document.getElementById('scan-error').style.display='none';document.getElementById('scan-preview-wrap').style.display='none';document.getElementById('scan-results-wrap').style.display='none';document.getElementById('scan-file-input').value='';}
+async function handleFileSelect(file){
+  if(!file)return;
+  const isImage=file.type.startsWith('image/');const isPdf=file.type==='application/pdf';
+  if(!isImage&&!isPdf){showScanError('Format non supporté.');return;}
+  document.getElementById('scan-drop-zone').style.display='none';
+  if(isImage){const url=URL.createObjectURL(file);document.getElementById('scan-preview').src=url;document.getElementById('scan-preview-wrap').style.display='block';}
+  document.getElementById('scan-progress-wrap').style.display='block';
+  try{
+    const base64=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(',')[1]);r.onerror=rej;r.readAsDataURL(file);});
+    const content=isImage?[{type:'image',source:{type:'base64',media_type:file.type,data:base64}},{type:'text',text:`Extrais les données. Réponds UNIQUEMENT en JSON valide sans markdown:\n{"prenom":"","nom":"","dateNaissance":"","adresse":"","npa":"","localite":"","tel":"","email":"","avs":"","nationalite":"","etatCivil":"","profession":"","employeur":"","notes":""}`}]:[{type:'document',source:{type:'base64',media_type:'application/pdf',data:base64}},{type:'text',text:`Extrais les données. Réponds UNIQUEMENT en JSON valide sans markdown:\n{"prenom":"","nom":"","dateNaissance":"","adresse":"","npa":"","localite":"","tel":"","email":"","avs":"","nationalite":"","etatCivil":"","profession":"","employeur":"","notes":""}`}];
+    const resp=await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,messages:[{role:'user',content}]})});
+    const data=await resp.json();const text=(data.content||[]).map(i=>i.text||'').join('');
+    scanResult2=JSON.parse(text.replace(/```json|```/g,'').trim());
+    document.getElementById('scan-progress-wrap').style.display='none';showScanResults(scanResult2);
+  }catch(e){document.getElementById('scan-progress-wrap').style.display='none';showScanError('Impossible d\'extraire les données.');}
+}
+function showScanError(msg){const el=document.getElementById('scan-error');el.textContent=msg;el.style.display='block';document.getElementById('scan-drop-zone').style.display='block';}
+function showScanResults(data){const labels={prenom:'Prénom',nom:'Nom',dateNaissance:'Naissance',tel:'Tél',email:'Email',adresse:'Adresse',npa:'NPA',localite:'Localité',avs:'N° AVS',nationalite:'Nationalité',etatCivil:'État civil',profession:'Profession',employeur:'Employeur'};let html='';Object.entries(labels).forEach(([k,l])=>{if(data[k])html+=`<div class="scan-result-item"><div class="scan-result-label">${l}</div><div class="scan-result-value">${data[k]}</div></div>`;});document.getElementById('scan-results-grid').innerHTML=html;document.getElementById('scan-results-wrap').style.display='block';}
+function applyScanData(){if(!scanResult2)return;['prenom','nom','tel','email','adresse','npa','localite','nationalite','profession','employeur'].forEach(k=>{const el=document.getElementById('f-'+k);if(el&&scanResult2[k])el.value=scanResult2[k];});if(scanResult2.dateNaissance)document.getElementById('f-datenaissance').value=scanResult2.dateNaissance;if(scanResult2.etatCivil)document.getElementById('f-etatcivil').value=scanResult2.etatCivil;if(scanResult2.avs)document.getElementById('f-avs').value=scanResult2.avs;closeScanner();switchTab('infos');}
+
+// ═══════════════════════════════════════════════════════════════
+// HISTORIQUE DES ACTIONS
+// ═══════════════════════════════════════════════════════════════
+const ACTION_ICONS={'📞 Appel':'📞','📧 Email':'📧','🤝 RDV':'🤝','📄 Contrat':'📄','💬 SMS':'💬','📝 Note':'📝'};
+let currentActionType='📞 Appel';
+
+function openAddAction(){document.getElementById('add-action-form').style.display='block';document.getElementById('planifier-rdv-form').style.display='none';document.getElementById('action-desc').focus();}
+function planifierRDV(){
+  document.getElementById('planifier-rdv-form').style.display='block';
+  document.getElementById('add-action-form').style.display='none';
+  // Pre-fill with client name
+  const node=nodeMap[selectedNodeId];
+  const name=node?.label||'';
+  document.getElementById('rdv-title').value=name?`RDV ${name}`:'';
+  document.getElementById('rdv-date').value=new Date().toISOString().slice(0,10);
+  document.getElementById('rdv-time').value='09:00';
+  document.getElementById('rdv-notes').value='';
+  document.getElementById('rdv-title').focus();
+}
+function saveRDV(){
+  const title=document.getElementById('rdv-title').value.trim();
+  const date=document.getElementById('rdv-date').value;
+  const time=document.getElementById('rdv-time').value;
+  const notes=document.getElementById('rdv-notes').value.trim();
+  if(!title||!date){document.getElementById('rdv-title').style.borderColor=!title?'rgba(239,68,68,0.5)':'';return;}
+  // Add to agenda
+  agendaEvents.push({id:'evt'+Date.now(),title,date,time,type:'🤝 RDV',notes});
+  saveAgendaEvents();
+  // Also add to client history
+  const node=nodeMap[selectedNodeId];
+  if(node&&node.client){
+    if(!node.client.actions)node.client.actions=[];
+    node.client.actions.unshift({id:'a'+Date.now(),type:'🤝 RDV',desc:`RDV planifié — ${date}${time?' à '+time:''} ${notes?'— '+notes:''}`,date:new Date().toISOString()});
+    scheduleSave();renderActions();
+  }
+  document.getElementById('planifier-rdv-form').style.display='none';
+  // Show confirmation
+  const confirmMsg=document.createElement('div');
+  confirmMsg.style.cssText='background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.25);border-radius:8px;padding:10px 14px;color:#34d399;font-size:12px;margin-bottom:10px;text-align:center';
+  confirmMsg.innerHTML=`✅ RDV ajouté à l'agenda — ${new Date(date).toLocaleDateString('fr-CH',{weekday:'long',day:'numeric',month:'long'})}${time?' à '+time:''}`;
+  document.getElementById('actions-list').insertAdjacentElement('beforebegin',confirmMsg);
+  setTimeout(()=>confirmMsg.remove(),4000);
+}
+function selectActionType(btn,type){currentActionType=type;document.querySelectorAll('.action-type-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');}
+
+function saveAction(){
+  const desc=document.getElementById('action-desc').value.trim();
+  if(!desc)return;
+  const node=nodeMap[selectedNodeId];if(!node)return;
+  if(!node.client.actions)node.client.actions=[];
+  node.client.actions.unshift({id:'a'+Date.now(),type:currentActionType,desc,date:new Date().toISOString()});
+  document.getElementById('action-desc').value='';
+  document.getElementById('add-action-form').style.display='none';
+  saveData();renderActions();
+}
+
+function deleteAction(id){
+  const node=nodeMap[selectedNodeId];if(!node)return;
+  node.client.actions=(node.client.actions||[]).filter(a=>a.id!==id);
+  saveData();renderActions();
+}
+
+function renderActions(){
+  const node=nodeMap[selectedNodeId];
+  const list=node?.client?.actions||[];
+  const el=document.getElementById('actions-list');
+  if(!list.length){
+    el.innerHTML=`<div style="text-align:center;padding:28px 0;color:#2a4060;font-size:13px">Aucune action enregistrée.<br><span style="font-size:11px">Cliquez "+ Action" pour commencer.</span></div>`;
+    return;
+  }
+  el.innerHTML=list.map(a=>{
+    const d=new Date(a.date);
+    const dateStr=d.toLocaleDateString('fr-CH',{day:'2-digit',month:'2-digit',year:'numeric'});
+    const timeStr=d.toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'});
+    return `<div style="display:flex;gap:10px;padding:10px 12px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:9px;margin-bottom:6px">
+      <div style="font-size:18px;flex-shrink:0;margin-top:1px">${a.type.split(' ')[0]}</div>
+      <div style="flex:1;overflow:hidden">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <span style="color:#4a9eff;font-size:11px;font-weight:700">${a.type}</span>
+          <span style="color:#2a4060;font-size:10px">${dateStr} ${timeStr}</span>
+        </div>
+        <div style="color:#a8bdd0;font-size:12px;line-height:1.4;word-break:break-word">${a.desc}</div>
+      </div>
+      <button onclick="deleteAction('${a.id}')" style="background:none;border:none;color:#3a5070;cursor:pointer;font-size:13px;flex-shrink:0;padding:0 2px;align-self:flex-start" title="Supprimer">✕</button>
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DÉTECTION DOUBLON
+// ═══════════════════════════════════════════════════════════════
+let dupPendingNode=null;
+let dupFoundId=null;
+
+function normalize(s){return(s||'').toLowerCase().replace(/[^a-z0-9]/g,'');}
+
+function findDuplicate(label,client){
+  const newNom=normalize(client?.nom);
+  const newPrenom=normalize(client?.prenom);
+  const newTel=normalize(client?.tel);
+  const newEmail=normalize(client?.email);
+  for(const n of nodes){
+    if(n.isRoot||!n.client)continue;
+    const nom=normalize(n.client.nom);
+    const prenom=normalize(n.client.prenom);
+    const tel=normalize(n.client.tel);
+    const email=normalize(n.client.email);
+    // Match on name OR phone OR email
+    if(newNom&&nom&&newNom===nom&&newPrenom&&prenom&&newPrenom===prenom)return n;
+    if(newTel&&tel&&newTel===tel&&newTel.length>5)return n;
+    if(newEmail&&email&&newEmail===email&&newEmail.length>4)return n;
+  }
+  return null;
+}
+
+function showDupAlert(dup,pendingFn){
+  dupFoundId=dup.id;
+  dupPendingNode=pendingFn;
+  const c=dup.client;
+  document.getElementById('dup-msg').innerHTML=`<b style="color:#fbbf24">${dup.label}</b> existe déjà dans votre réseau.<br>Tél: ${c?.tel||'—'} &nbsp;|&nbsp; Email: ${c?.email||'—'}<br>Statut: ${c?.status||'prospect'}`;
+  document.getElementById('dup-alert').classList.add('show');
+}
+function openDupNode(){document.getElementById('dup-alert').classList.remove('show');if(dupFoundId)openModal(dupFoundId);}
+function dismissDup(){document.getElementById('dup-alert').classList.remove('show');if(dupPendingNode)dupPendingNode();}
+function cancelDup(){document.getElementById('dup-alert').classList.remove('show');dupPendingNode=null;}
+
+// ═══════════════════════════════════════════════════════════════
+// EXPORT PDF
+// ═══════════════════════════════════════════════════════════════
+function exportClientPDF(){
+  const node=nodeMap[selectedNodeId];
+  if(!node||node.isRoot)return;
+  const c=node.client||{};
+  const actions=c.actions||[];
+  const vendus=(c.produitsVendus||[]).map(id=>Object.values(PRODUCTS).flat().find(p=>p.id===id)?.label||id);
+  const interets=(c.produitsInterets||[]).map(id=>Object.values(PRODUCTS).flat().find(p=>p.id===id)?.label||id);
+  const today=new Date().toLocaleDateString('fr-CH',{day:'2-digit',month:'2-digit',year:'numeric'});
+
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8">
+  <style>
+    body{font-family:'Helvetica Neue',Arial,sans-serif;color:#1a2030;padding:40px;max-width:750px;margin:0 auto;font-size:13px}
+    h1{color:#1e6fcf;font-size:22px;margin:0 0 4px}
+    .sub{color:#6b8099;font-size:12px;margin-bottom:24px}
+    .section{margin-bottom:22px}
+    .section-title{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:#1e6fcf;font-weight:700;border-bottom:1px solid #e0e8f0;padding-bottom:5px;margin-bottom:12px}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:6px 20px}
+    .field{margin-bottom:2px}
+    .field-label{color:#8899aa;font-size:10px;text-transform:uppercase;letter-spacing:.06em}
+    .field-value{color:#1a2030;font-weight:600;font-size:13px}
+    .badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;margin:2px}
+    .badge-vendu{background:#d1fae5;color:#065f46}
+    .badge-interet{background:#fef3c7;color:#92400e}
+    .status{display:inline-block;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700}
+    .status-prospect{background:#fef3c7;color:#92400e}
+    .status-actif{background:#d1fae5;color:#065f46}
+    .status-recontacter{background:#dbeafe;color:#1e40af}
+    .status-perdu{background:#f3f4f6;color:#4b5563}
+    .action{padding:8px 12px;border-left:3px solid #1e6fcf;background:#f0f6ff;border-radius:0 6px 6px 0;margin-bottom:6px}
+    .action-type{color:#1e6fcf;font-size:10px;font-weight:700;text-transform:uppercase}
+    .action-date{color:#8899aa;font-size:10px;float:right}
+    .action-desc{color:#1a2030;font-size:12px;margin-top:3px}
+    .footer{margin-top:32px;padding-top:12px;border-top:1px solid #e0e8f0;color:#8899aa;font-size:10px;display:flex;justify-content:space-between}
+    @media print{body{padding:20px}}
+  </style></head><body>
+  <h1>${c.prenom||''} ${c.nom||''}</h1>
+  <div class="sub">Fiche client Swiss Life Select &nbsp;·&nbsp; Générée le ${today}</div>
+  <div class="section">
+    <div class="section-title">Informations personnelles</div>
+    <div class="grid">
+      ${[['Téléphone',c.tel],['Email',c.email],['Date naissance',c.dateNaissance],['N° AVS',c.avs],['Adresse',(c.adresse?c.adresse+', ':'')+[c.npa,c.localite].filter(Boolean).join(' '),'full'],['Nationalité',c.nationalite],['État civil',c.etatCivil],['Profession',c.profession],['Employeur',c.employeur]].filter(f=>f[1]).map(f=>`<div class="field ${f[2]||''}" ${f[2]==='full'?'style="grid-column:1/-1"':''}><div class="field-label">${f[0]}</div><div class="field-value">${f[1]}</div></div>`).join('')}
+    </div>
+  </div>
+  <div class="section">
+    <div class="section-title">Statut &nbsp;&nbsp; <span class="status status-${c.status||'prospect'}">${{prospect:'Prospect',actif:'Client actif',recontacter:'À recontacter',perdu:'Inactif'}[c.status||'prospect']}</span></div>
+    ${c.recontacterDate?`<div class="field"><div class="field-label">Date rappel</div><div class="field-value">${c.recontacterDate}${c.recontacterTime?' à '+c.recontacterTime:''}</div></div>`:''}
+    ${c.notes?`<div class="field" style="margin-top:8px"><div class="field-label">Notes</div><div class="field-value" style="white-space:pre-wrap">${c.notes}</div></div>`:''}
+  </div>
+  ${vendus.length||interets.length?`<div class="section"><div class="section-title">Produits</div>
+    ${vendus.length?`<div style="margin-bottom:8px"><div class="field-label" style="margin-bottom:5px">Vendus</div>${vendus.map(p=>`<span class="badge badge-vendu">✓ ${p}</span>`).join('')}</div>`:''}
+    ${interets.length?`<div><div class="field-label" style="margin-bottom:5px">Intérêts</div>${interets.map(p=>`<span class="badge badge-interet">★ ${p}</span>`).join('')}</div>`:''}
+  </div>`:''}
+  ${actions.length?`<div class="section"><div class="section-title">Historique (${actions.length} actions)</div>
+    ${actions.map(a=>{const d=new Date(a.date);return`<div class="action"><span class="action-type">${a.type}</span><span class="action-date">${d.toLocaleDateString('fr-CH')} ${d.toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'})}</span><div class="action-desc">${a.desc}</div></div>`;}).join('')}
+  </div>`:''}
+  <div class="footer"><span>Swiss Life Select — CRM Réseau</span><span>${c.prenom||''} ${c.nom||''} — ${today}</span></div>
+  </body></html>`;
+
+  const win=window.open('','_blank');
+  win.document.write(html);
+  win.document.close();
+  win.focus();
+  setTimeout(()=>win.print(),500);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// STATS & REMINDERS
+// ═══════════════════════════════════════════════════════════════
+function updateStats(){
+  const clients=nodes.filter(n=>!n.isRoot);
+  const t=clients.length,a=clients.filter(n=>n.client?.status==='actif').length,p=clients.filter(n=>!n.client||n.client.status==='prospect').length,pr=clients.reduce((acc,n)=>acc+(n.client?.produitsVendus?.length||0),0);
+  ['total','actif','prospect','produits'].forEach((k,i)=>{
+    const vals=[t,a,p,pr];
+    document.getElementById('stat-'+k).textContent=vals[i];
+    const sbKeys=['s-total','s-actif','s-prospect','s-produits'];
+    const sbEl=document.getElementById(sbKeys[i]);if(sbEl)sbEl.textContent=vals[i];
+  });
+}
+function updateReminders(){
+  const today=new Date();
+  // Rappels depuis les fiches clients
+  const fromNodes=nodes.filter(n=>n.client?.recontacterDate).map(n=>({id:n.id,label:n.label,date:new Date(n.client.recontacterDate),time:n.client.recontacterTime||'',note:'',nodeId:n.id,type:'client'})).filter(n=>n.date>=today);
+  // Rappels manuels
+  const manualRaw=storage.get('reminders_manual');
+  const manual=manualRaw?JSON.parse(manualRaw.value).map(r=>({...r,date:new Date(r.date),type:'manual'})).filter(r=>r.date>=today):[];
+  const all=[...fromNodes,...manual].sort((a,b)=>a.date-b.date).slice(0,8);
+  const el=document.getElementById('sb-reminders');
+  if(!all.length){el.innerHTML=`<div style="color:#2a4060;font-size:11px;padding:6px 8px">Aucun rappel</div>`;return;}
+  el.innerHTML=all.map(r=>`
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;border-radius:7px;cursor:pointer;transition:background .12s;margin-bottom:2px;gap:4px"
+      onmouseover="this.style.background='rgba(59,130,246,0.08)'" onmouseout="this.style.background=''"
+      onclick="${r.type==='client'?`openModal('${r.nodeId}')`:''}"
+    >
+      <div style="overflow:hidden;flex:1">
+        <div style="color:#c8d8f0;font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.label}</div>
+        ${r.note?`<div style="color:#3a5570;font-size:10px;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.note}</div>`:''}
+      </div>
+      <div style="display:flex;align-items:center;gap:5px;flex-shrink:0">
+        <div style="text-align:right">
+          <div style="color:#3b82f6;font-size:10px;font-weight:600">${r.date.toLocaleDateString('fr-CH')}</div>
+          ${r.time?`<div style="color:#4a6080;font-size:10px">${r.time}</div>`:''}
+        </div>
+        ${r.type==='manual'?`<span onclick="deleteReminder('${r.id}');event.stopPropagation()" style="color:#4a6080;font-size:12px;cursor:pointer;padding:0 2px" title="Supprimer">✕</span>`:''}
+      </div>
+    </div>`).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MANUAL REMINDERS
+// ═══════════════════════════════════════════════════════════════
+function openAddReminder(){
+  document.getElementById('add-reminder-form').style.display='block';
+  document.getElementById('reminder-title').focus();
+}
+function closeAddReminder(){
+  document.getElementById('add-reminder-form').style.display='none';
+  document.getElementById('reminder-title').value='';
+  document.getElementById('reminder-date').value='';
+  document.getElementById('reminder-time').value='';
+  document.getElementById('reminder-note').value='';
+}
+function saveReminder(){
+  const title=document.getElementById('reminder-title').value.trim();
+  const date=document.getElementById('reminder-date').value;
+  const time=document.getElementById('reminder-time').value;
+  const note=document.getElementById('reminder-note').value.trim();
+  if(!title||!date){
+    document.getElementById('reminder-title').style.borderColor=!title?'rgba(239,68,68,0.5)':'';
+    document.getElementById('reminder-date').style.borderColor=!date?'rgba(239,68,68,0.5)':'';
+    return;
+  }
+  const raw=storage.get('reminders_manual');
+  const list=raw?JSON.parse(raw.value):[];
+  list.push({id:'r'+Date.now(),label:title,date,time,note});
+  storage.set('reminders_manual',JSON.stringify(list));
+  closeAddReminder();
+  updateReminders();
+}
+function deleteReminder(id){
+  const raw=storage.get('reminders_manual');
+  if(!raw)return;
+  const list=JSON.parse(raw.value).filter(r=>r.id!==id);
+  storage.set('reminders_manual',JSON.stringify(list));
+  updateReminders();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════
+// Data loaded after Supabase auth in onAuthSuccess()
+rebuildIndex();
+</script>
+<!-- REMINDER ALERT OVERLAY -->
+<div id="reminder-alert" style="display:none;position:fixed;inset:0;background:rgba(0,8,18,0.85);z-index:500;align-items:center;justify-content:center;backdrop-filter:blur(8px)">
+  <div style="background:linear-gradient(145deg,#0c1620,#111e2e);border:1px solid rgba(59,130,246,0.4);border-radius:20px;padding:36px 40px;width:360px;text-align:center;box-shadow:0 0 60px rgba(59,130,246,0.2),0 24px 80px rgba(0,0,0,0.7);animation:alertPop .4s cubic-bezier(.175,.885,.32,1.275)">
+    <div id="alert-bell" style="font-size:52px;margin-bottom:16px;animation:bellRing 0.6s ease infinite alternate">🔔</div>
+    <div style="color:#3b82f6;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px">Rappel</div>
+    <div id="alert-title" style="color:#e8f0ff;font-size:20px;font-weight:800;margin-bottom:8px;line-height:1.3"></div>
+    <div id="alert-time" style="color:#4a6080;font-size:13px;margin-bottom:8px"></div>
+    <div id="alert-note" style="color:#6b8099;font-size:13px;margin-bottom:28px;line-height:1.5"></div>
+    <button onclick="dismissAlert()" style="width:100%;padding:13px 0;background:linear-gradient(135deg,#1e6fcf,#1a5cb8);border:none;border-radius:11px;color:#fff;font-weight:700;font-size:15px;cursor:pointer;font-family:'DM Sans',sans-serif;box-shadow:0 4px 20px rgba(30,111,207,0.4)">OK, j'ai vu ✓</button>
+  </div>
+</div>
+<style>
+.evt-type-btn{padding:4px 10px;border-radius:6px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.05);color:#6b8099;font-size:11px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s}
+.evt-type-btn.active{background:rgba(74,158,255,0.2);border-color:rgba(74,158,255,0.4);color:#4a9eff}
+.cal-day{min-height:70px;padding:4px;border-right:1px solid rgba(255,255,255,0.05);border-bottom:1px solid rgba(255,255,255,0.05);cursor:pointer;transition:background .15s;position:relative}
+.cal-day:hover{background:rgba(74,158,255,0.05)}
+.cal-day.today{background:rgba(74,158,255,0.08)}
+.cal-day.other-month{opacity:.3}
+.cal-evt{font-size:10px;padding:2px 5px;border-radius:4px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
+.tbl-row{display:grid;grid-template-columns:2fr 1.2fr 1.2fr 1fr 80px;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,0.05);align-items:center;transition:background .12s;cursor:pointer}
+.tbl-row:hover{background:rgba(74,158,255,0.06)}
+.tbl-head{background:rgba(255,255,255,0.04);font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#4a6080;font-weight:700;cursor:default}
+.tbl-head:hover{background:rgba(255,255,255,0.04)}
+.status-badge{padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;display:inline-block}
+.kpi-card{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07);border-radius:10px;padding:14px;text-align:center}
+.kpi-val{font-size:22px;font-weight:800;margin-bottom:4px}
+.kpi-lbl{color:#4a6080;font-size:10px}
+.obj-row{display:flex;flex-direction:column;gap:5px}
+.obj-label{display:flex;justify-content:space-between;align-items:center}
+.obj-bar-wrap{background:rgba(255,255,255,0.07);border-radius:4px;height:6px;overflow:hidden}
+.obj-bar{height:100%;border-radius:4px;transition:width .5s ease}
+</style>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// REMINDER ALERT SYSTEM
+// ═══════════════════════════════════════════════════════════════
+let alertedIds=JSON.parse(localStorage.getItem('alerted_ids')||'[]');
+
+function checkReminderAlerts(){
+  const now=new Date();
+  // Check manual reminders
+  const raw=storage.get('reminders_manual');
+  const manualList=raw?JSON.parse(raw.value):[];
+  // Check client node reminders with time set
+  const clientReminders=nodes.filter(n=>n.client?.recontacterDate&&n.client?.recontacterTime).map(n=>({id:'node_'+n.id,label:n.label,date:n.client.recontacterDate,time:n.client.recontacterTime,note:n.client.notes||''}));
+  const all=[...manualList,...clientReminders];
+  for(const r of all){
+    if(!r.time)continue;
+    const reminderDT=new Date(`${r.date}T${r.time}`);
+    const diffMs=now-reminderDT;
+    if(diffMs>=0&&diffMs<60000&&!alertedIds.includes(r.id)){
+      alertedIds.push(r.id);
+      localStorage.setItem('alerted_ids',JSON.stringify(alertedIds));
+      showReminderAlert(r);
+      break;
+    }
+  }
+}
+
+function showReminderAlert(r){
+  document.getElementById('alert-title').textContent=r.label;
+  document.getElementById('alert-time').textContent=`📅 ${new Date(`${r.date}T${r.time}`).toLocaleString('fr-CH',{weekday:'long',day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'})}`;
+  document.getElementById('alert-note').textContent=r.note||'';
+  document.getElementById('alert-note').style.display=r.note?'block':'none';
+  const el=document.getElementById('reminder-alert');
+  el.style.display='flex';
+  // Try browser notification too
+  if('Notification' in window&&Notification.permission==='granted'){
+    new Notification('🔔 Rappel Swiss Life CRM',{body:`${r.label}${r.note?' — '+r.note:''}`,icon:''});
+  }
+}
+
+function dismissAlert(){
+  document.getElementById('reminder-alert').style.display='none';
+}
+
+// Request notification permission on load
+if('Notification' in window&&Notification.permission==='default'){
+  Notification.requestPermission();
+}
+
+// Check every 30 seconds
+setInterval(checkReminderAlerts,30000);
+checkReminderAlerts();
+</script>
+
+<script>
+// ═══ TIMEOUT 5 MIN ═══
+let inactivityTimer;
+function resetInactivityTimer(){
+  clearTimeout(inactivityTimer);
+  inactivityTimer=setTimeout(()=>{
+    if(currentUser){
+      sb.auth.signOut();
+      currentUser=null;nodes=[];nodeMap={};
+      document.getElementById('auth-screen').classList.remove('hidden');
+      document.getElementById('user-bar').style.display='none';
+      document.getElementById('auth-err').textContent='Session expirée après 5 minutes d\'inactivité.';
+    }
+  },5*60*1000);
+}
+['mousedown','mousemove','keydown','touchstart','scroll'].forEach(evt=>document.addEventListener(evt,resetInactivityTimer,{passive:true}));
+resetInactivityTimer();
+
+// ═══ LOG DES CONNEXIONS ═══
+async function logConnection(user){
+  try{
+    const existing=JSON.parse(localStorage.getItem('conn_logs')||'[]');
+    existing.unshift({email:user.email,date:new Date().toISOString(),ua:navigator.userAgent.slice(0,60)});
+    localStorage.setItem('conn_logs',JSON.stringify(existing.slice(0,20)));
+    await sb.from('nodes').upsert([{id:'log_'+Date.now(),user_id:user.id,parent_id:null,x:0,y:0,label:'__log__',client:{type:'connection_log',email:user.email,date:new Date().toISOString(),ua:navigator.userAgent.slice(0,60)}}],{onConflict:'id'});
+  }catch(e){}
+}
+const _origOnAuthSuccess=onAuthSuccess;
+// Patch onAuthSuccess to also log
+const _patchedAuth=function(user){_origOnAuthSuccess(user);logConnection(user);};
+
+// ═══ VIEW NAVIGATION ═══
+let currentView='carte';
+let currentEvtType='🤝 RDV';
+let editingEvtId=null;
+
+function showView(v){
+  currentView=v;
+  ['carte','tableau','agenda','kpis','chatbot'].forEach(name=>{
+    const el=document.getElementById('view-'+name);
+    const nav=document.getElementById('nav-'+name);
+    if(el){el.style.display=name===v?(name==='chatbot'?'flex':'block'):'none';}
+    if(nav){nav.classList.toggle('active',name===v);}
+  });
+  if(v==='tableau')renderTableau();
+  if(v==='agenda')renderAgenda();
+  if(v==='kpis')renderKPIs();
+  if(v==='chatbot'){document.getElementById('view-chatbot').style.display='flex';}
+}
+
+// ═══ TABLEAU CLIENTS ═══
+function renderTableau(){
+  const search=(document.getElementById('tbl-search')?.value||'').toLowerCase();
+  const filter=document.getElementById('tbl-filter')?.value||'';
+  let rows=nodes.filter(n=>!n.isRoot);
+  if(filter)rows=rows.filter(n=>(n.client?.status||'prospect')===filter);
+  if(search)rows=rows.filter(n=>`${n.client?.prenom||''} ${n.client?.nom||''} ${n.client?.tel||''} ${n.client?.email||''}`.toLowerCase().includes(search));
+  const statusColors={prospect:'rgba(245,158,11,0.15)',actif:'rgba(16,185,129,0.15)',recontacter:'rgba(59,130,246,0.15)',perdu:'rgba(107,114,128,0.15)'};
+  const statusText={prospect:'#fbbf24',actif:'#34d399',recontacter:'#60a5fa',perdu:'#9ca3af'};
+  const statusLabels={prospect:'Prospect',actif:'Actif',recontacter:'Rappel',perdu:'Inactif'};
+  let html=`<div class="tbl-row tbl-head"><div>Nom</div><div>Téléphone</div><div>Email</div><div>Statut</div><div>Produits</div></div>`;
+  if(!rows.length){html+=`<div style="padding:32px;text-align:center;color:#2a4060;font-size:13px">Aucun contact trouvé</div>`;}
+  else{rows.forEach(n=>{
+    const c=n.client||{};const s=c.status||'prospect';const v=c.produitsVendus?.length||0;
+    html+=`<div class="tbl-row" onclick="openModal('${n.id}')">
+      <div style="color:#e8f0ff;font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.prenom||''} ${c.nom||n.label}</div>
+      <div style="color:#6b8099;font-size:12px">${c.tel||'—'}</div>
+      <div style="color:#6b8099;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.email||'—'}</div>
+      <div><span class="status-badge" style="background:${statusColors[s]};color:${statusText[s]}">${statusLabels[s]}</span></div>
+      <div style="color:${v>0?'#a78bfa':'#2a4060'};font-size:12px;font-weight:600">${v>0?v+' vendu'+( v>1?'s':''):'—'}</div>
+    </div>`;
+  });}
+  document.getElementById('tableau-container').innerHTML=html;
+}
+
+// ═══ AGENDA ═══
+let agendaDate=new Date();
+let agendaEvents=JSON.parse(localStorage.getItem('agenda_events')||'[]');
+
+function saveAgendaEvents(){localStorage.setItem('agenda_events',JSON.stringify(agendaEvents));}
+
+function agendaNav(dir){agendaDate=new Date(agendaDate.getFullYear(),agendaDate.getMonth()+dir,1);renderAgenda();}
+
+function selectEvtType(btn,type){currentEvtType=type;document.querySelectorAll('.evt-type-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');}
+
+function openAddAgendaEvent(date=''){
+  editingEvtId=null;
+  document.getElementById('agenda-form-title').textContent='Nouvel événement';
+  document.getElementById('evt-title').value='';
+  document.getElementById('evt-date').value=date||new Date().toISOString().slice(0,10);
+  document.getElementById('evt-time').value='09:00';
+  document.getElementById('evt-notes').value='';
+  document.getElementById('evt-delete-btn').style.display='none';
+  document.querySelectorAll('.evt-type-btn').forEach((b,i)=>{b.classList.toggle('active',i===0);});
+  currentEvtType='🤝 RDV';
+  document.getElementById('agenda-event-form').style.display='block';
+  document.getElementById('agenda-overlay').style.display='block';
+}
+function openEditEvent(id){
+  const evt=agendaEvents.find(e=>e.id===id);if(!evt)return;
+  editingEvtId=id;
+  document.getElementById('agenda-form-title').textContent='Modifier l\'événement';
+  document.getElementById('evt-title').value=evt.title;
+  document.getElementById('evt-date').value=evt.date;
+  document.getElementById('evt-time').value=evt.time||'';
+  document.getElementById('evt-notes').value=evt.notes||'';
+  document.getElementById('evt-delete-btn').style.display='block';
+  currentEvtType=evt.type||'🤝 RDV';
+  document.querySelectorAll('.evt-type-btn').forEach(b=>{b.classList.toggle('active',b.textContent.trim()===currentEvtType);});
+  document.getElementById('agenda-event-form').style.display='block';
+  document.getElementById('agenda-overlay').style.display='block';
+}
+function closeAgendaForm(){document.getElementById('agenda-event-form').style.display='none';document.getElementById('agenda-overlay').style.display='none';}
+function saveAgendaEvent(){
+  const title=document.getElementById('evt-title').value.trim();
+  const date=document.getElementById('evt-date').value;
+  if(!title||!date)return;
+  if(editingEvtId){
+    const idx=agendaEvents.findIndex(e=>e.id===editingEvtId);
+    if(idx>-1)agendaEvents[idx]={...agendaEvents[idx],title,date,time:document.getElementById('evt-time').value,type:currentEvtType,notes:document.getElementById('evt-notes').value};
+  }else{
+    agendaEvents.push({id:'evt'+Date.now(),title,date,time:document.getElementById('evt-time').value,type:currentEvtType,notes:document.getElementById('evt-notes').value});
+  }
+  saveAgendaEvents();closeAgendaForm();renderAgenda();
+}
+function deleteAgendaEvent(){if(editingEvtId){agendaEvents=agendaEvents.filter(e=>e.id!==editingEvtId);saveAgendaEvents();closeAgendaForm();renderAgenda();}}
+
+const EVT_COLORS={'🤝 RDV':'rgba(16,185,129,0.7)','📞 Appel':'rgba(59,130,246,0.7)','📄 Contrat':'rgba(167,139,250,0.7)','🎓 Formation':'rgba(245,158,11,0.7)','💼 Autre':'rgba(107,114,128,0.6)'};
+
+function renderAgenda(){
+  const y=agendaDate.getFullYear(),m=agendaDate.getMonth();
+  const months=['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+  document.getElementById('agenda-month-label').textContent=`${months[m]} ${y}`;
+  const firstDay=(new Date(y,m,1).getDay()+6)%7;
+  const daysInMonth=new Date(y,m+1,0).getDate();
+  const today=new Date();
+  let html=`<div style="display:grid;grid-template-columns:repeat(7,1fr)">`;
+  ['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'].forEach(d=>{html+=`<div style="padding:8px 4px;text-align:center;color:#4a6080;font-size:10px;font-weight:700;text-transform:uppercase;border-bottom:1px solid rgba(255,255,255,0.07)">${d}</div>`;});
+  for(let i=0;i<firstDay;i++)html+=`<div class="cal-day other-month"></div>`;
+  for(let d=1;d<=daysInMonth;d++){
+    const dateStr=`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const isToday=today.getFullYear()===y&&today.getMonth()===m&&today.getDate()===d;
+    const dayEvts=agendaEvents.filter(e=>e.date===dateStr);
+    // Also show client reminders
+    const clientEvts=nodes.filter(n=>n.client?.recontacterDate===dateStr);
+    html+=`<div class="cal-day${isToday?' today':''}" onclick="openAddAgendaEvent('${dateStr}')">
+      <div style="font-size:11px;color:${isToday?'#4a9eff':'#6b8099'};font-weight:${isToday?700:400};margin-bottom:2px">${d}</div>
+      ${dayEvts.map(e=>`<div class="cal-evt" style="background:${EVT_COLORS[e.type]||'rgba(74,158,255,0.5)'};color:#fff" onclick="event.stopPropagation();openEditEvent('${e.id}')">${e.type.split(' ')[0]} ${e.title}</div>`).join('')}
+      ${clientEvts.map(n=>`<div class="cal-evt" style="background:rgba(59,130,246,0.4);color:#93c5fd">📞 ${n.label}</div>`).join('')}
+    </div>`;
+  }
+  html+=`</div>`;
+  document.getElementById('agenda-grid').innerHTML=html;
+  // Upcoming events list
+  const upcoming=[...agendaEvents].filter(e=>new Date(e.date)>=new Date(new Date().toDateString())).sort((a,b)=>new Date(a.date)-new Date(b.date)).slice(0,6);
+  document.getElementById('agenda-events-list').innerHTML=upcoming.length
+    ?upcoming.map(e=>`<div style="display:flex;gap:10px;align-items:center;padding:8px 12px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:8px;margin-bottom:6px;cursor:pointer" onclick="openEditEvent('${e.id}')">
+      <div style="font-size:16px">${e.type.split(' ')[0]}</div>
+      <div style="flex:1"><div style="color:#e8f0ff;font-size:12px;font-weight:600">${e.title}</div><div style="color:#4a6080;font-size:11px">${new Date(e.date).toLocaleDateString('fr-CH',{weekday:'short',day:'numeric',month:'short'})}${e.time?' à '+e.time:''}</div></div>
+      <div style="width:8px;height:8px;border-radius:50%;background:${EVT_COLORS[e.type]||'#4a9eff'};flex-shrink:0"></div>
+    </div>`).join('')
+    :`<div style="color:#2a4060;font-size:12px;text-align:center;padding:16px">Aucun événement à venir</div>`;
+}
+
+// ═══ KPIs ═══
+let objectifs=JSON.parse(localStorage.getItem('objectifs')||'{"clients":20,"actifs":10,"produits":15,"rdv":8}');
+
+function renderKPIs(){
+  const cl=nodes.filter(n=>!n.isRoot);
+  const stats={total:cl.length,actif:cl.filter(n=>n.client?.status==='actif').length,prospect:cl.filter(n=>!n.client||n.client.status==='prospect').length,produits:cl.reduce((a,n)=>a+(n.client?.produitsVendus?.length||0),0),rdv:agendaEvents.filter(e=>e.type==='🤝 RDV'&&new Date(e.date)>=new Date(new Date().toDateString())).length,conv:cl.length?Math.round(cl.filter(n=>n.client?.status==='actif').length/cl.length*100):0};
+  document.getElementById('kpi-stats').innerHTML=`
+    <div class="kpi-card"><div class="kpi-val" style="color:#4a9eff">${stats.total}</div><div class="kpi-lbl">Total contacts</div></div>
+    <div class="kpi-card"><div class="kpi-val" style="color:#10b981">${stats.actif}</div><div class="kpi-lbl">Clients actifs</div></div>
+    <div class="kpi-card"><div class="kpi-val" style="color:#f59e0b">${stats.prospect}</div><div class="kpi-lbl">Prospects</div></div>
+    <div class="kpi-card"><div class="kpi-val" style="color:#a78bfa">${stats.produits}</div><div class="kpi-lbl">Produits vendus</div></div>
+    <div class="kpi-card"><div class="kpi-val" style="color:#10b981">${stats.conv}%</div><div class="kpi-lbl">Taux conversion</div></div>
+    <div class="kpi-card"><div class="kpi-val" style="color:#3b82f6">${stats.rdv}</div><div class="kpi-lbl">RDV à venir</div></div>`;
+  const objDefs=[{key:'clients',label:'Contacts total',val:stats.total,color:'#4a9eff'},{key:'actifs',label:'Clients actifs',val:stats.actif,color:'#10b981'},{key:'produits',label:'Produits vendus',val:stats.produits,color:'#a78bfa'},{key:'rdv',label:'RDV ce mois',val:stats.rdv,color:'#3b82f6'}];
+  document.getElementById('objectifs-list').innerHTML=objDefs.map(o=>{
+    const pct=Math.min(100,Math.round((o.val/(objectifs[o.key]||1))*100));
+    return`<div class="obj-row"><div class="obj-label"><span style="color:#c8d8f0;font-size:12px">${o.label}</span><span style="color:#4a6080;font-size:11px">${o.val} / <input id="obj-${o.key}" type="number" value="${objectifs[o.key]||0}" min="1" style="background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,0.2);color:#e8f0ff;font-size:11px;width:40px;outline:none;text-align:center"></span></div><div class="obj-bar-wrap"><div class="obj-bar" style="width:${pct}%;background:${o.color}"></div></div></div>`;
+  }).join('');
+}
+function saveObjectifs(){
+  ['clients','actifs','produits','rdv'].forEach(k=>{const el=document.getElementById('obj-'+k);if(el)objectifs[k]=parseInt(el.value)||1;});
+  localStorage.setItem('objectifs',JSON.stringify(objectifs));
+  renderKPIs();
+}
+async function generateKpiInsights(){
+  const el=document.getElementById('kpi-insights');
+  el.textContent='⏳ Analyse en cours…';
+  const cl=nodes.filter(n=>!n.isRoot);
+  const stats={total:cl.length,actif:cl.filter(n=>n.client?.status==='actif').length,prospect:cl.filter(n=>!n.client||n.client.status==='prospect').length,recontacter:cl.filter(n=>n.client?.status==='recontacter').length,produits:cl.reduce((a,n)=>a+(n.client?.produitsVendus?.length||0),0)};
+  try{
+    const resp=await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:600,system:'Tu es un analyste CRM pour un conseiller Swiss Life Select en Suisse. Analyse les KPIs et donne des recommandations concrètes en français, en 4-5 points courts.',messages:[{role:'user',content:`KPIs: ${JSON.stringify(stats)}, Objectifs: ${JSON.stringify(objectifs)}. Analyse et recommande.`}]})});
+    const data=await resp.json();
+    el.innerHTML=(data.content||[]).map(i=>i.text||'').join('').replace(/\n/g,'<br>');
+  }catch(e){el.textContent='Erreur de connexion.';}
+}
+
+// ═══ IA FEATURES - Résumé, Suggestions, Opportunités ═══
+function safeAddMsg(role,text){
+  // Add to whichever chatbot is currently visible/active
+  const embVisible=document.getElementById('view-chatbot')&&document.getElementById('view-chatbot').style.display!=='none';
+  if(embVisible&&document.getElementById('chatbot-messages-embedded')){
+    return addEmbMsg(role,text);
+  }
+  // Default: open panel chatbot
+  document.getElementById('chatbot-panel').classList.add('open');
+  return addChatMsg(role,text);
+}
+
+async function generateClientSummary(nodeId){
+  const node=nodeMap[nodeId];if(!node||!node.client)return;
+  const c=node.client;
+  safeAddMsg('user',`Résume la situation de ${c.prenom||''} ${c.nom||''}`);
+  const thinking=safeAddMsg('thinking','⏳ Analyse…');
+  try{
+    const resp=await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:500,system:'Tu es assistant CRM Swiss Life Select. Fais un résumé concis et actionnable de la situation client en français.',messages:[{role:'user',content:`Client: ${JSON.stringify({prenom:c.prenom,nom:c.nom,profession:c.profession,statut:c.status,produits:c.produitsVendus,interets:c.produitsInterets,notes:c.notes,actions:(c.actions||[]).slice(0,5).map(a=>a.type+': '+a.desc)})} Fais un résumé et recommande les prochaines actions.`}]})});
+    const data=await resp.json();
+    const text=(data.content||[]).map(i=>i.text||'').join('');
+    thinking.remove();safeAddMsg('ai',text);
+  }catch(e){thinking.remove();safeAddMsg('ai','❌ Erreur: '+e.message);}
+}
+
+async function suggestProducts(nodeId){
+  const node=nodeMap[nodeId];if(!node||!node.client)return;
+  const c=node.client;
+  safeAddMsg('user',`Quels produits proposer à ${c.prenom||''} ${c.nom||''} ?`);
+  const thinking=safeAddMsg('thinking','⏳ Analyse du profil…');
+  try{
+    const resp=await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:600,system:'Tu es conseiller Swiss Life Select expert en Suisse. Suggère les produits les plus adaptés au profil client avec une justification courte.',messages:[{role:'user',content:`Profil: ${JSON.stringify({profession:c.profession,etatCivil:c.etatCivil,employeur:c.employeur,produitsDejaVendus:c.produitsVendus||[],notes:c.notes})} Quels produits Swiss Life recommander en priorité ?`}]})});
+    const data=await resp.json();
+    thinking.remove();safeAddMsg('ai',(data.content||[]).map(i=>i.text||'').join(''));
+  }catch(e){thinking.remove();safeAddMsg('ai','❌ Erreur: '+e.message);}
+}
+
+async function detectOpportunities(){
+  safeAddMsg('user','Quels clients contacter en priorité ?');
+  const thinking=safeAddMsg('thinking','⏳ Analyse du réseau…');
+  const cl=nodes.filter(n=>!n.isRoot&&n.client);
+  const summary=cl.slice(0,20).map(n=>({nom:n.label,statut:n.client.status,produits:n.client.produitsVendus?.length||0,derniereAction:n.client.actions?.[0]?.date||null,rappel:n.client.recontacterDate||null}));
+  try{
+    const resp=await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:700,system:'Tu es assistant CRM Swiss Life Select. Identifie les opportunités prioritaires. Sois concis et actionnable.',messages:[{role:'user',content:`Portefeuille (${cl.length} clients): ${JSON.stringify(summary)} Qui contacter en priorité et pourquoi ?`}]})});
+    const data=await resp.json();
+    thinking.remove();safeAddMsg('ai',(data.content||[]).map(i=>i.text||'').join(''));
+  }catch(e){thinking.remove();safeAddMsg('ai','❌ Erreur: '+e.message);}
+}
+
+// Add IA buttons to modal header (called when modal opens)
+const _origOpenModal=openModal;
+window.openModal=function(id){
+  _origOpenModal(id);
+  const node=nodeMap[id];
+  if(node&&!node.isRoot){
+    const badges=document.getElementById('modal-badges');
+    if(badges&&!badges.querySelector('.ia-btns')){
+      const div=document.createElement('div');
+      div.className='ia-btns';div.style.cssText='display:flex;gap:5px;margin-top:6px;flex-wrap:wrap';
+      div.innerHTML=`<button onclick="closeModal();setTimeout(()=>{document.getElementById('chatbot-panel').classList.add('open');generateClientSummary('${id}');},100)" style="padding:3px 9px;background:rgba(74,158,255,0.12);border:1px solid rgba(74,158,255,0.2);border-radius:6px;color:#4a9eff;font-size:10px;cursor:pointer;font-family:'DM Sans',sans-serif">🤖 Résumé IA</button>
+      <button onclick="closeModal();setTimeout(()=>{document.getElementById('chatbot-panel').classList.add('open');suggestProducts('${id}');},100)" style="padding:3px 9px;background:rgba(167,139,250,0.12);border:1px solid rgba(167,139,250,0.2);border-radius:6px;color:#a78bfa;font-size:10px;cursor:pointer;font-family:'DM Sans',sans-serif">💡 Suggestions</button>`;
+      badges.appendChild(div);
+    }
+  }
+};
+
+// Embedded chatbot uses same logic but different message container
+let embChatAttachment=null;
+function handleChatbotFileEmb(file){if(!file)return;embChatAttachment=file;const tag=document.createElement('div');tag.className='chat-attach-tag';tag.innerHTML=`📎 ${file.name} <span onclick="embChatAttachment=null;document.getElementById('chatbot-attachments-embedded').innerHTML=''" style="cursor:pointer">✕</span>`;document.getElementById('chatbot-attachments-embedded').innerHTML='';document.getElementById('chatbot-attachments-embedded').appendChild(tag);}
+function addEmbMsg(role,text){const el=document.createElement('div');el.className=`chat-msg ${role}`;el.innerHTML=text.replace(/\*\*(.*?)\*\*/g,'<b>$1</b>').replace(/\n/g,'<br>');document.getElementById('chatbot-messages-embedded').appendChild(el);document.getElementById('chatbot-messages-embedded').scrollTop=99999;return el;}
+async function sendEmbChatMessage(){
+  const input=document.getElementById('chatbot-input-embedded');const msg=input.value.trim();
+  if(!msg&&!embChatAttachment)return;input.value='';
+  if(msg)addEmbMsg('user',msg);
+  const thinking=addEmbMsg('thinking','⏳ Traitement…');
+  if(embChatAttachment){
+    const file=embChatAttachment;const isExcel=file.name.match(/\.(xlsx|xls|csv)$/i);
+    embChatAttachment=null;document.getElementById('chatbot-attachments-embedded').innerHTML='';
+    if(isExcel){thinking.remove();addEmbMsg('ai',`📊 Import en cours…`);await handleExcelImport(file,false);addEmbMsg('system','✅ Import terminé !');return;}
+  }
+  // Detect special commands
+  const lm=msg.toLowerCase();
+  if(lm.includes('opportunité')||lm.includes('priorité')||lm.includes('contacter')){
+    thinking.remove();
+    const _orig=addChatMsg;window.addChatMsg=(r,t)=>{addEmbMsg(r,t);return{remove:()=>{}};};
+    await detectOpportunities();window.addChatMsg=_orig;return;
+  }
+  if(lm.includes('statistique')||lm.includes('rapport')){
+    thinking.remove();const cl=nodes.filter(n=>!n.isRoot);
+    addEmbMsg('ai',`📊 **Rapport CRM**\n\n• Total : **${cl.length}** contacts\n• Actifs : **${cl.filter(n=>n.client?.status==='actif').length}**\n• Prospects : **${cl.filter(n=>!n.client||n.client.status==='prospect').length}**\n• Produits vendus : **${cl.reduce((a,n)=>a+(n.client?.produitsVendus?.length||0),0)}**`);return;
+  }
+  try{
+    const resp=await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:700,system:`Assistant CRM Swiss Life Select Suisse. ${nodes.filter(n=>!n.isRoot).length} contacts. Réponds en français.`,messages:[{role:'user',content:msg}]})});
+    const data=await resp.json();thinking.remove();addEmbMsg('ai',(data.content||[]).map(i=>i.text||'').join(''));
+  }catch(e){thinking.remove();addEmbMsg('ai','❌ Erreur de connexion.');}
+}
+
+// Add "Détection opportunités" button to chatbot
+setTimeout(()=>{
+  const msgDiv=document.getElementById('chatbot-messages');
+  if(msgDiv){
+    const btn=document.createElement('button');
+    btn.style.cssText='margin:4px auto;display:block;padding:6px 14px;background:rgba(167,139,250,0.12);border:1px solid rgba(167,139,250,0.2);border-radius:8px;color:#a78bfa;font-size:11px;cursor:pointer;font-family:\'DM Sans\',sans-serif';
+    btn.textContent='🔍 Détecter les opportunités';
+    btn.onclick=()=>detectOpportunities();
+    msgDiv.appendChild(btn);
+  }
+},500);
+
+// ═══ PWA ═══
+if('serviceWorker' in navigator){
+  const swCode=`
+self.addEventListener('install',e=>self.skipWaiting());
+self.addEventListener('activate',e=>e.waitUntil(self.clients.claim()));
+self.addEventListener('fetch',e=>{
+  if(e.request.url.includes('api.anthropic')||e.request.url.includes('supabase'))return;
+  e.respondWith(fetch(e.request).catch(()=>caches.match(e.request)));
+});`;
+  const blob=new Blob([swCode],{type:'application/javascript'});
+  navigator.serviceWorker.register(URL.createObjectURL(blob)).catch(()=>{});
+}
+// Add to home screen prompt
+let deferredPrompt;
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredPrompt=e;const btn=document.createElement('button');btn.style.cssText='position:fixed;bottom:76px;right:20px;z-index:44;padding:8px 14px;background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.3);border-radius:20px;color:#34d399;font-size:11px;font-weight:600;cursor:pointer;font-family:\'DM Sans\',sans-serif';btn.textContent='📲 Installer l\'app';btn.onclick=()=>{deferredPrompt.prompt();deferredPrompt.userChoice.then(()=>btn.remove());};document.body.appendChild(btn);});
+
+// ═══ MANIFEST PWA ═══
+const manifest={name:'Swiss Life CRM',short_name:'CRM SL',start_url:'/',display:'standalone',background_color:'#06101a',theme_color:'#1e6fcf',icons:[{src:'https://api.qrserver.com/v1/create-qr-code/?size=192x192&data=app&bgcolor=06101a&color=4a9eff',sizes:'192x192',type:'image/png'}]};
+const mblob=new Blob([JSON.stringify(manifest)],{type:'application/json'});
+const mlink=document.createElement('link');mlink.rel='manifest';mlink.href=URL.createObjectURL(mblob);document.head.appendChild(mlink);
+const metaTheme=document.createElement('meta');metaTheme.name='theme-color';metaTheme.content='#1e6fcf';document.head.appendChild(metaTheme);
+const metaApple=document.createElement('meta');metaApple.name='apple-mobile-web-app-capable';metaApple.content='yes';document.head.appendChild(metaApple);
+
+// ═══ NOTIFICATIONS PUSH ═══
+if('Notification' in window&&Notification.permission==='default')Notification.requestPermission();
+
+</script>
+
+
+</body>
+</html>
